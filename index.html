@@ -1,0 +1,38 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
+  <meta name="theme-color" content="#0b0f17" />
+  <title>Gin's Online Dart's Scoring System</title>
+  <link rel="manifest" href="./manifest.webmanifest" />
+  <link rel="icon" type="image/svg+xml" href="./assets/dart.svg" />
+  <link rel="stylesheet" href="./styles/main.css?v=0.5.3" />
+  <!-- =================================================================
+       App configuration. Set these BEFORE the app script loads to
+       pre-configure behavior. All are optional — the app works
+       without any of them.
+
+       With these set, the "Set up Google sign-in" setup screen is
+       hidden from end users. They get the consent popup directly
+       when they tap "Sign in with Google" in Settings.
+
+       SUPERADMIN_EMAILS gates dev/admin tools (the Client ID
+       setup section in Settings) to specific Google accounts.
+       ================================================================= -->
+  <script>
+    window.GOOGLE_CLIENT_ID = '843204989604-lsddu2umjh3e4erkco8sh0vr5om39bbd.apps.googleusercontent.com';
+    window.SUPERADMIN_EMAILS = ['zdenkor@gmail.com'];
+  </script>
+</head>
+<body>
+  <div id="app"></div>
+
+  <!-- Third-party libs (vendored) -->
+  <script src="./lib/qrious.min.js"></script>
+
+  <!-- App modules (vanilla ES modules). The version query busts caches
+       when the app is redeployed. -->
+  <script type="module" src="./js/app.js?v=0.5.3"></script>
+</body>
+</html>

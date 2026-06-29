@@ -1,0 +1,12 @@
+{
+  "name": "Gin's Online Dart's Scoring System",
+  "short_name": "GinDarts",
+  "description": "Serverless dart scoring for 01, Cricket, and Shanghai. Pass-and-play or peer-to-peer online.",
+  "start_url": "./",
+  "display": "standalone",
+  "background_color": "#0b0f17",
+  "theme_color": "#0b0f17",
+  "icons": [
+    { "src": "./assets/dart.svg", "sizes": "any", "type": "image/svg+xml", "purpose": "any maskable" }
+  ]
+}

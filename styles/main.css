@@ -1,0 +1,1690 @@
+/* =================================================================
+   Gin's Online Dart's Scoring System — main stylesheet
+   Dark, dart-board inspired, mobile-first, no framework.
+
+   ----------------------------------------------------------------------------
+   RESPONSIVE DESIGN CONVENTIONS — DO NOT VIOLATE
+   ----------------------------------------------------------------------------
+   1. NO hardcoded `px` for layout dimensions (width, height, max-height,
+      min-height, padding, margin, gap, top/right/bottom/left). Use:
+        - `vh` / `vw` / `vmin` / `vmax`           for viewport-relative size
+        - `%`                                     for size relative to the
+                                                   parent container
+        - `clamp(min, fluid, max)`                for fluid range
+        - `em` / `rem`                            for text and small
+                                                   container-relative sizes
+      The ONLY px values allowed are:
+        - `border` widths (`1px`, `2px`)
+        - `min-height` on touch targets (38–44px) for accessibility
+        - `letter-spacing` and `border-radius` cosmetic values
+        - explicit icon / svg sizes when the asset is intrinsically px
+   2. Text inside boxes / frames is sized as a PERCENTAGE of the parent
+      container's width or height (use `font-size: cqi` with container
+      queries, or `font-size: clamp(2vmin, 2.5cqw, 4vmin)` on
+      container-query-supported elements). The parent element MUST
+      establish a `container-type` so the % resolves relative to it,
+      not the viewport.
+   3. Two orientation layouts:
+        - LANDSCAPE: `aspect-ratio > 1` (width > height) — used on
+          desktop, tablets landscape, phones landscape.
+        - PORTRAIT:  `aspect-ratio < 1` (height > width)  — used on
+          phones portrait, tablets portrait.
+      The same component rules apply across all viewports — only the
+      container sizes change with viewport. Components do NOT switch
+      layout based on orientation; they adapt via flex / grid +
+      container queries. If you find yourself adding
+      `@media (orientation: ...)` rules, you are probably doing it
+      wrong — prefer a container query or a flex/grid re-flow.
+   4. When in doubt: measure in `%` of the parent. If the parent has no
+      explicit size, give it one with `vh` / `vw` / `min(vh, vw)`.
+   ----------------------------------------------------------------------------
+   ================================================================= */
+
+:root {
+  --bg: #0b0f17;
+  --bg-2: #11161f;
+  --surface: #161c27;
+  --surface-2: #1d2533;
+  --line: #2a3344;
+  --text: #e6ecf5;
+  --muted: #8a96a8;
+  --accent: #1ec28b;          /* dartboard green */
+  --accent-2: #ff4d6d;        /* bullseye red */
+  --warn: #ffb454;
+  --danger: #ff5566;
+  --good: #5dd39e;
+  --radius: 14px;
+  --shadow: 0 6px 18px rgba(0,0,0,.35);
+  --font: system-ui, -apple-system, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+  /* Scoreboard + calculator share this width so they always align.
+     Scales fluidly: small phones get ~280px, tablets ~700px,
+     desktop/4K cap at 1100px — beyond that the numpad tiles would
+     push past comfortable reach and the score numbers would have
+     too much empty space around them. */
+  --content-max: min(1100px, calc(100% - 24px));
+}
+
+* { box-sizing: border-box; }
+html { font-size: 16px; }
+/* Fluid root font: 15px on small phones, 17px on desktops. Ensures
+   tiles, badges, and buttons are readable on every viewport. */
+@media (min-width: 720px) { html { font-size: 17px; } }
+html, body { margin: 0; padding: 0; background: var(--bg); color: var(--text); font-family: var(--font); -webkit-font-smoothing: antialiased; }
+body {
+  min-height: 100dvh; font-size: 1rem;
+}
+button { font: inherit; color: inherit; cursor: inherit !important; }
+a { cursor: inherit !important; }
+input, select, textarea { font: inherit; color: inherit; cursor: inherit; }
+
+/* ---------- Layout ---------- */
+#app { display: flex; flex-direction: column; min-height: 100dvh; }
+.app-header {
+  display: flex; align-items: center; justify-content: space-between;
+  padding: 14px 18px; background: linear-gradient(180deg, #0e1422, #0b0f17);
+  border-bottom: 1px solid var(--line); position: sticky; top: 0; z-index: 10;
+}
+.app-header h1 {
+  margin: 0; font-size: 18px; letter-spacing: .3px;
+  display: flex; align-items: center; gap: 10px;
+}
+.app-header h1 .logo {
+  width: 28px; height: 28px; border-radius: 50%;
+  background: radial-gradient(circle at 50% 50%, var(--accent), #0b3d2b);
+  box-shadow: inset 0 0 0 2px #fff2, 0 0 0 2px #0006;
+}
+.app-header .sub { color: var(--muted); font-size: 12px; }
+.icon-btn {
+  background: var(--surface-2); border: 1px solid var(--line);
+  color: var(--text); width: 44px; height: 44px; border-radius: 10px;
+  display: inline-flex; align-items: center; justify-content: center;
+}
+.icon-btn:hover { background: #232c3d; }
+
+/* Sign-in / sign-out icon buttons in the header. The SVG inherits
+   `currentColor` via fill on hover. When disabled (the user is in
+   the opposite auth state), the button is greyed out and
+   non-clickable. */
+.icon-btn.auth-btn svg { width: 20px; height: 20px; fill: currentColor; }
+
+/* ---------- help icon styles ---------- */
+.help-icon {
+  width: 18px; height: 18px; min-width: 18px;
+  display: inline-flex; align-items: center; justify-content: center;
+  border-radius: 50%; border: 1px solid var(--line);
+  background: transparent; color: var(--muted);
+  font-size: 11px; line-height: 1;
+  margin-left: 6px; padding: 0; cursor: help !important;
+  vertical-align: middle;
+}
+.help-icon:hover { color: var(--text); border-color: var(--text); background: rgba(255,255,255,0.08); }
+
+.icon-btn.auth-btn.disabled { opacity: .35; cursor: not-allowed !important; }
+.icon-btn.auth-btn.disabled:hover { background: var(--surface-2); }
+
+.help-modal-body p { line-height: 1.5; }
+.help-modal-body ul { padding-left: 18px; margin: 8px 0; }
+.help-modal-body li { margin-bottom: 4px; }
+
+.icon-btn.auth-btn.sign-out:not(.disabled) { color: #ef4444; border-color: #7a1a1a; }
+.icon-btn.auth-btn.sign-out:not(.disabled):hover { background: #2a1313; }
+.icon-btn.auth-btn.sign-in:not(.disabled)  { color: #22c55e; border-color: #1a4d2c; }
+.icon-btn.auth-btn.sign-in:not(.disabled):hover { background: #102a18; }
+.icon-btn.auth-btn.settings-btn { color: var(--muted); border-color: var(--line); }
+.icon-btn.auth-btn.settings-btn:hover { color: var(--text); background: #232c3d; }
+.icon-btn.auth-btn.disabled { opacity: .35; cursor: not-allowed; }
+.icon-btn.auth-btn.disabled:hover { background: var(--surface-2); }
+
+main { flex: 1; padding: 16px; width: 100%; margin: 0 auto;
+  /* Enable container queries so descendants (scoreboard, calculator)
+     can react to the inline size of the content area rather than the
+     viewport. This is what lets a tablet held in portrait and a 4K
+     monitor use the same component code without per-breakpoint hacks.
+     No max-width here on purpose: the container query gives us a real
+     1920px+ width on 4K, where a viewport-only media query would
+     still be capped at the old 980px content column. Modern laptops
+     all support this (Chrome 105+, Safari 16+, Firefox 110+), and the
+     older tablets in scope run a recent enough WebView from Play. */
+  container-type: inline-size;
+  container-name: app;
+}
+/* Container-query breakpoint rules live at the END of this file so
+   they win on source order against the same-specificity base rules. */
+.screen { display: none; }
+.screen.active { display: block; }
+/* The game screen uses a vertical flex layout so the calculator can
+   absorb whatever vertical space is left after the toolbar, scoreboard
+   and turn-info. This is what keeps the calculator fully visible on
+   short viewports like 1024×600 landscape and 1280×800 desktop. */
+.screen.active.game-screen {
+  /* `absolute` (not `fixed`) so the .calc sticky element inside
+     works correctly — `fixed` ancestor with `overflow: auto` cancels
+     sticky for descendants. Filling the viewport from `<main>`
+     which is itself a 100dvh flex container.
+
+     Grid layout (4 rows): toolbar | history | scoreboard | calc.
+     The history row uses `1fr` so it absorbs leftover vertical
+     space (grows when there's room, shrinks via internal scroll
+     when there isn't). The scoreboard row is `auto` so cards keep
+     their natural height. The calc row is `auto` so the calculator
+     keeps its natural button grid (it has its own `max-height:
+     55vh` cap inside `.calc` to stop it ballooning on tall
+     screens). Fluid sizing throughout — see top-of-file
+     "RESPONSIVE DESIGN CONVENTIONS". */
+  position: absolute;
+  inset: 0;
+  z-index: 20;
+  display: grid;
+  grid-template-rows: auto minmax(0, 1fr) auto auto;
+  height: 100%;
+  overflow-y: auto;
+  background: var(--bg);
+}
+
+.history-panel {
+  width: 100%;
+  max-width: var(--content-max);
+  margin: 0 auto 4px;
+}
+.history-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(80px, 1fr));
+  gap: 10px;
+}
+.history-col { display: flex; flex-direction: column; gap: 2px; }
+.history-empty {
+  font-size: 13px;
+  color: var(--muted);
+  text-align: center;
+  padding: 4px 0;
+}
+.history-chips {
+  display: flex;
+  flex-wrap: nowrap;
+  gap: 4px;
+  justify-content: center;
+  overflow: hidden;
+}
+.history-chip {
+  background: var(--surface-2);
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  padding: 6px 10px;
+  font-size: clamp(12px, 2.2vw, 14px);
+  color: var(--text);
+  min-height: 34px;
+  line-height: 1.1;
+  cursor: default;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  flex: 1 1 auto;
+  min-width: 0;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.history-chip.editable {
+  cursor: pointer;
+  transition: background .12s ease, border-color .12s ease;
+}
+.history-chip.editable:hover,
+.history-chip.editable:focus {
+  background: var(--bg-2);
+  border-color: var(--accent);
+  outline: none;
+}
+.history-chip.more {
+  flex: 0 0 auto;
+  min-width: 34px;
+  padding: 6px 8px;
+  color: var(--muted);
+}
+.history-modal-body {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  max-height: 60vh;
+  overflow-y: auto;
+  padding: 4px;
+}
+
+/* On short viewports shrink the history panel so the calc stays usable. */
+@media (max-height: 640px) {
+  .history-grid { gap: 3px; }
+  .history-chip { padding: 3px 5px; font-size: 10px; min-height: 24px; border-radius: 6px; }
+  .history-chip.more { min-width: 22px; }
+}
+
+.screen.active.game-screen > .game-toolbar { flex: 0 0 auto; }
+/* Shared history strip — grows to fill the vertical space between
+   the toolbar (above) and the scoreboard (below). On tall displays
+   the strip shows many rounds; on short displays it scrolls
+   internally so the scoreboard and calc stay visible. */
+/* History strip. Capped with `max-height` so it never eats the
+   whole viewport and pushes the scoreboard or calculator off
+   screen. When many rounds are played, the strip scrolls inside
+   the cap so the user always sees the calc at the bottom and the
+   scoreboard just below the toolbar. */
+.screen.active.game-screen > .shared-history { flex: 1 1 auto; min-height: 0; max-height: min(45vh, 360px); }
+.screen.active.game-screen > .shared-history > .shared-history-list {
+  flex: 1 1 auto;
+  min-height: 0;
+  overflow-y: auto;
+  /* Rows are appended in DOM order from oldest (round 1) to newest
+     (round N). The header is the first child so it sits at the
+     top of the strip. Scroll-down reveals newer rounds (default
+     flex column direction, top-to-bottom reading order). */
+  flex-direction: column;
+  /* Hide scrollbar: the live-feed layout shouldn't need a visible
+     scrollbar. Old rounds scroll off the bottom of the visible
+     area. */
+  scrollbar-width: none;
+}
+/* (Shared-history height cap is set by the base rule above —
+   `max-height: min(45vh, 360px)` — and stays the same at every
+   viewport height. `flex: 1 1 auto` lets the strip grow into any
+   free space inside the game-screen grid, then scroll internally
+   when its content overflows the cap. No per-viewport overrides
+   needed here, which keeps the scrolling behaviour predictable
+   across orientations and resolutions.) */
+.screen.active.game-screen > .scoreboard {
+  flex: 0 0 auto;
+  min-height: 0;
+}
+/* The scoreboard wraps [card | history] in cells. Cap each cell so the
+   history list scrolls internally instead of stretching the whole
+   page. We let the scoreboard fill the leftover viewport, then cap the
+   row height so on tall screens the cells don't grow without limit. */
+.screen.active.game-screen > .scoreboard .scoreboard-cell {
+  max-height: min(45vh, 360px);
+}
+.screen.active.game-screen > .history-panel { flex: 0 0 auto; }
+/* Calculator is nested inside .calcHost (a no-class div appended to
+   the screen) so the > combinator doesn't match — use a descendant
+   selector.
+
+   Grid row 4 (last row) of `.screen.active.game-screen` — the row
+   uses `1fr` so the calc always consumes leftover space, leaving
+   ZERO gap underneath regardless of screen size or orientation.
+   No `position: sticky` here: the parent is a CSS grid, not a
+   scroll container, so the calc just sits in its grid cell at
+   the bottom of the viewport.
+
+   All sizing is fluid (vh / % / min(vh, vw)) — no hardcoded px so
+   the calc breathes with the viewport. See top-of-file
+   "RESPONSIVE DESIGN CONVENTIONS" before changing anything here. */
+.screen.active.game-screen .calc {
+  /* Grid row 4 (last row). Use `min-height: 0` so grid can shrink
+     the calc if viewport is too short, and `max-height: 55vh` so
+     the calc never consumes more than 55% of viewport height
+     (history + scoreboard + toolbar must always have room).
+     The calc keeps its natural aspect ratio / button sizes; the
+     shared-history row (1fr) absorbs any leftover vertical space.
+     See top-of-file "RESPONSIVE DESIGN CONVENTIONS". */
+  flex: 0 0 auto;
+  height: auto;
+  min-height: 0;
+  /* 52vh cap (~10% smaller than the previous 58vh) so the calc
+     takes even less vertical real estate. Still big enough on
+     short viewports (<640px) — fall through to the media-query
+     rule below which adjusts further. */
+  max-height: 52vh;
+  overflow: hidden;
+  background: var(--bg);
+  align-self: end;
+  width: 100%;
+}
+/* On very short viewports let the calc shrink a bit more. */
+@media (max-height: 640px) {
+  /* Cap the calc at 48vh (= 298px on a 620px viewport, ~10% smaller
+     than the previous 54vh) so the calculator takes even less
+     vertical real estate. Buttons are also ~10% smaller to keep
+     the bottom row visible. */
+  .screen.active.game-screen .calc { max-height: 48vh; min-height: 0; }
+  .calc-action-btn { min-height: 31px; padding: 2px; }
+  .calc-btn        { min-height: 25px; padding: 2px 0; }
+  .calc-fast-btn   { min-height: 29px; padding: 2px; }
+}
+@media (max-height: 760px) {
+  /* On viewports under 760px tall, the action / numpad / fast
+     buttons must stay compact so the bottom row clears the
+     viewport. Container queries at >=720 inline-size can still
+     fire on these tall-but-narrow viewports (e.g. a 1280×720
+     tablet in landscape), so we override here. */
+  .calc-btn        { padding: 0.125em 0 !important; }
+  .calc-fast-btn   { padding: 0.125em !important; }
+  .calc-action-btn { padding: 0.125em !important; }
+  .calc-display    { padding: 0.0625em 0.75em !important; }
+}
+@media (max-height: 640px) {
+  /* !important versions — override the base `.calc-btn` /
+     `.calc-action-btn` / `.calc-display` rules which set larger
+     touch targets. The 4.5vh min-height (= ~28px on a 620px
+     viewport) keeps the bottom row visible while ensuring the
+     action row (power / = / …), the entered-number display and
+     the numpad buttons are all the same height — visually
+     consistent, no wasted vertical space.
+
+     max-height acts as a hard cap so container-query padding
+     bumps (10px on .calc-action-btn, clamp(10px, 1.8vw, 22px)
+     on .calc-btn) can't blow the button past the 4.5vh target.
+     The button visually settles at 4.5vh tall.
+
+     Font sizes and padding use % (relative to parent root
+     font-size, 16px) rather than hardcoded px so they scale with
+     user / device text-size preferences. */
+  .calc-action-btn { min-height: 4.5vh !important; max-height: 4.5vh !important; padding: 0.125em !important; font-size: 125% !important; }
+  .calc-btn        { min-height: 4.5vh !important; max-height: 4.5vh !important; padding: 0.125em 0 !important; font-size: 125% !important; }
+  .calc-fast-btn   { min-height: 4.5vh !important; max-height: 4.5vh !important; padding: 0.125em !important; font-size: 100% !important; }
+  .calc-display    { min-height: 4.5vh !important; max-height: 4.5vh !important; padding: 0.0625em 0.75em !important; }
+  .calc-entered    { font-size: 125% !important; line-height: 1 !important; letter-spacing: 0.0625em !important; }
+  .calc-pad        { gap: 4px !important; grid-auto-rows: 4.5vh !important; }
+  .calc-actions    { grid-auto-rows: 4.5vh !important; }
+}
+
+/* ---------- Buttons ---------- */
+.btn {
+  background: var(--surface-2); border: 1px solid var(--line); color: var(--text);
+  padding: 12px 16px; border-radius: 10px; font-weight: 600;
+  /* Touch target: 44px baseline so all buttons are tappable on phones
+     and tablets. */
+  min-height: 44px;
+  font-size: 1rem;
+  transition: transform .04s ease, background .15s ease, border-color .15s ease;
+  display: inline-flex; align-items: center; justify-content: center; gap: 8px;
+}
+.btn:hover { background: #232c3d; }
+.btn:active { transform: translateY(1px); }
+.btn.primary { background: var(--accent); border-color: var(--accent); color: #062018; }
+.btn.primary:hover { background: #2cd49a; }
+.btn.danger { background: var(--danger); border-color: var(--danger); color: #2a070c; }
+.btn.ghost { background: transparent; }
+.btn.kind-option { border: 1px solid rgba(255,255,255,0.15); }
+.btn.kind-selected { color: #2cd49a !important; border-color: #2cd49a !important; background: rgba(44,212,154,0.08) !important; font-weight: 600; }
+.btn.kind-selected input[type="radio"] { accent-color: #2cd49a; }
+
+/* Segmented control — touch-friendly button row (replaces dropdowns). */
+.btn-row.segmented {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  margin-top: 6px;
+}
+.btn.segmented-btn {
+  flex: 1 1 auto;
+  min-width: 56px;
+  min-height: 44px;
+  padding: 10px 14px;
+  font-size: 15px;
+  border-radius: 10px;
+  background: var(--bg-2);
+  color: var(--text);
+  border: 1px solid var(--line);
+  text-align: center;
+  transition: background 120ms ease, color 120ms ease, border-color 120ms ease;
+}
+.btn.segmented-btn:hover {
+  background: rgba(255,255,255,0.06);
+  border-color: rgba(255,255,255,0.25);
+}
+.btn.segmented-selected {
+  background: rgba(44,212,154,0.18) !important;
+  color: #2cd49a !important;
+  border-color: #2cd49a !important;
+  font-weight: 600;
+  box-shadow: 0 0 0 1px rgba(44,212,154,0.4) inset;
+}
+.field.button-row-field label {
+  margin-bottom: 4px;
+}
+
+/* Generic input class — readable on dark background, white text. */
+input.input, select.input, textarea.input,
+input.dropdown-readable, select.dropdown-readable {
+  width: 100%;
+  background: #1a212c;
+  color: #e6ecf5;
+  border: 1px solid var(--line);
+  border-radius: 10px;
+  padding: 12px 14px;
+  font-size: 15px;
+}
+input.input:focus, select.input:focus, textarea.input:focus,
+input.dropdown-readable:focus, select.dropdown-readable:focus {
+  outline: 2px solid #2cd49a;
+  outline-offset: 1px;
+}
+select.input option, select.dropdown-readable option {
+  background: #1a212c;
+  color: #e6ecf5;
+}
+.btn.big { padding: 16px 22px; font-size: 17px; }
+.btn.block { width: 100%; }
+.btn-row { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; margin-top: 14px; }
+.btn-row.three { grid-template-columns: repeat(3, 1fr); }
+.btn-row.four  { grid-template-columns: repeat(4, 1fr); }
+
+/* ---------- Menu ---------- */
+.menu { display: grid; gap: 14px; }
+.menu h2 { margin: 8px 0 0; font-size: 22px; }
+.menu .lede { color: var(--muted); margin: 0 0 10px; }
+.card {
+  background: var(--surface); border: 1px solid var(--line);
+  border-radius: var(--radius); padding: 16px; box-shadow: var(--shadow);
+}
+.menu-grid {
+  display: grid; grid-template-columns: 1fr 1fr; gap: 12px;
+}
+@media (min-width: 720px) { .menu-grid { grid-template-columns: repeat(3, 1fr); } }
+
+.tile {
+  background: var(--surface); border: 1px solid var(--line); border-radius: var(--radius);
+  padding: 18px; text-align: left; transition: background .15s ease, border-color .15s ease, transform .04s ease;
+}
+.tile:hover { background: var(--surface-2); border-color: #3a455a; }
+.tile:active { transform: translateY(1px); }
+.tile h3 { margin: 0 0 6px; font-size: 1.125rem; }
+.tile p { margin: 0; color: var(--muted); font-size: 0.9375rem; line-height: 1.4; }
+.tile .badge {
+  display: inline-block; font-size: 0.75rem; padding: 3px 8px; border-radius: 999px;
+  background: #243049; color: #c8d3ea; margin-bottom: 8px;
+}
+
+/* ---------- Setup form ---------- */
+.field { display: block; margin-bottom: 12px; }
+.field label { display: block; font-size: 12px; color: var(--muted); margin-bottom: 6px; text-transform: uppercase; letter-spacing: .8px; }
+.field input[type="text"], .field input[type="number"], .field select {
+  width: 100%; background: var(--bg-2); border: 1px solid var(--line); border-radius: 10px;
+  color: var(--text); padding: 12px 14px; font-size: 15px;
+}
+.player-row {
+  display: grid; grid-template-columns: 1fr auto; gap: 10px; align-items: center;
+  background: var(--bg-2); border: 1px solid var(--line); border-radius: 10px; padding: 10px 12px; margin-bottom: 8px;
+}
+.player-row input { background: transparent; border: none; color: var(--text); font-size: 15px; padding: 4px 2px; width: 100%; }
+.player-row input:focus { outline: none; }
+.player-row .x { background: transparent; border: 1px solid var(--line); border-radius: 8px; width: 30px; height: 30px; color: var(--muted); }
+.player-row .x:hover { color: var(--danger); border-color: var(--danger); }
+
+/* ---------- Game screen ---------- */
+.game-toolbar {
+  display: flex; flex-wrap: wrap; gap: 1.5%; align-items: center; justify-content: space-between;
+  background: var(--surface); border: 1px solid var(--line); border-radius: var(--radius);
+  padding: 0.55vh 2%; margin-bottom: 1%;
+  /* 90% font-size relative to parent so the toolbar content is
+     ~10% smaller than the rest of the screen — buttons, meta text
+     and totals all scale together. Padding also shrinks by ~10%
+     (0.55vh ≈ 5.4px on a 620px viewport, down from 6px). */
+  font-size: 90%;
+}
+.game-toolbar .meta { display: flex; gap: 10px; flex-wrap: wrap; min-width: 0; }
+.game-toolbar .meta > div:nth-child(-n+2) { display: none; } /* hide Game + Round/Turn */
+.game-toolbar .meta div { font-size: clamp(11px, 1.4vw, 13px); color: var(--muted); }
+.game-toolbar .meta strong {
+  color: var(--text);
+  font-size: clamp(13px, 1.7vw, 16px);
+  display: block;
+  overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+  max-width: 100%;
+}
+
+/* ---------- Player scoreboard ----------
+   Always 2 columns wide (wraps to 2 rows for 3+ players) and pinned
+   to the same max-width as the calculator so they always share width
+   (via the shared --content-max CSS custom property). */
+/* Scoreboard: 2-column grid — [player 1] [player 2]. The shared
+   history strip (cumulative dart counts per round) was hoisted to
+   live between the toolbar and the scoreboard at screen level, so
+   the scoreboard itself is now just two player cards. */
+.scoreboard {
+  display: grid;
+  gap: 6px;
+  grid-template-columns: 1fr 1fr;
+  width: 100%;
+  max-width: var(--content-max);
+  margin: 0 auto;
+  align-items: stretch;
+}
+/* Per-player column: [history list | player card] stacked. */
+.scoreboard-cell {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  min-width: 0;
+  min-height: 0;
+}
+.scoreboard-cell > .player-card {
+  flex: 0 0 auto;
+}
+/* Shared history that lives between the two player cards. Fills the
+   full height of the middle scoreboard column. */
+.shared-history {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+  min-height: 0;
+  flex: 1 1 0;
+  background: var(--surface);
+  border: 1px solid var(--line);
+  border-radius: var(--radius);
+  overflow: hidden;
+  /* Match the calc/scoreboard width so all three blocks share the
+     same left/right edges. */
+  max-width: var(--content-max);
+  width: 100%;
+  margin: 0 auto;
+}
+/* History rows. 5 columns:
+   [P1 thrown | P1 remaining | round × 3 | P2 thrown | P2 remaining]
+   The round count sits in the middle.
+
+   Rows are appended in DOM order from oldest (round 1) to newest
+   (round N), with the header at the very top. Combined with
+   `scrollbar-width: none` + webkit hack below, this gives a clean
+   table-style look with no scroll bar visible. See top-of-file
+   "RESPONSIVE DESIGN CONVENTIONS" before changing. */
+   .shared-history-list {
+     display: flex;
+     flex-direction: column;
+  width: 100%;
+  margin: 0 auto;
+  flex: 1 1 0;
+  /* Hide the scrollbar — old rounds scroll off the bottom of the
+     visible area silently. The user never needs to see or use the
+     bar. */
+  scrollbar-width: none;
+}
+.shared-history-list::-webkit-scrollbar { display: none; }
+.shared-history-row {
+  display: grid;
+  /* 5 columns with quintile column positions:
+       col 1: 0-25%   (P1 Scored,  text left-aligned at 0%)
+       col 2: 25-40%  (P1 To Go,   text right-aligned at 25%)
+       col 3: 40-60%  (DART,       text centered at 50%)
+       col 4: 60-75%  (P2 Scored,  text left-aligned at 75%)
+       col 5: 75-100% (P2 To Go,   text right-aligned at 100%)
+     The layout is perfectly symmetric around the 50% DART
+     centerline, with cell widths in a 25:15:20:15:25 ratio so
+     P1 Scored and P2 To Go mirror each other (both 25% wide),
+     and P1 To Go and P2 Scored mirror each other (both 15%). */
+  grid-template-columns: 25fr 15fr 20fr 15fr 25fr;
+  gap: 0.5%;                       /* ~ 0.5% of row width — fluid horizontal spacing */
+  align-items: center;
+  /* 80% font-size (relative to parent) keeps rows compact without
+     hardcoding px. min-height and padding use viewport-relative
+     vh/% so the row breathes with the screen size while never
+     forcing a pixel value. The 4vh floor caps the row short
+     enough that ~10 rounds fit comfortably on a 600px-tall
+     history strip; it scales down gracefully on smaller phones
+     (3.5vh). */
+  padding: 0.4vh 2%;             /* ~0.4vh top/bottom, 2% row width left/right */
+    font-size: 100%;                  /* 100% of parent font-size */
+    min-height: 4vh;
+  line-height: 1.2;
+  color: var(--text);
+  border-bottom: 1px solid var(--line);
+  font-variant-numeric: tabular-nums;
+  cursor: default;
+}
+.shared-history-row:last-child { border-bottom: none; }
+/* Header row above the round data. Mirrors the cricket-style
+   4-column Scored / To Go layout (P1 / P2). Compact, muted, no
+   border-bottom so it doesn't compete with the data rows. */
+.shared-history-row.sh-header {
+  min-height: 0;
+  padding: 0.8% 2%;              /* fluid horizontal + vertical padding */
+  font-size: 70%;                /* 70% of parent — smaller than data rows */
+  font-weight: 600;
+  color: var(--muted);
+  text-transform: uppercase;
+  letter-spacing: 0.05em;         /* em-based letter-spacing, no px */
+  border-bottom: 1px solid var(--line);
+  background: var(--bg-2);
+}
+/* Active (current) round row — green highlight per user preference. */
+.shared-history-row.active {
+  background: rgba(28, 194, 139, 0.18);
+  color: var(--text);
+}
+.shared-history-row.active .sh-round {
+  color: var(--accent);
+  font-weight: 700;
+}
+.shared-history-row .sh-thrown {
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  /* Touch target floor: ~4 character widths ≈ 50-70px on tablet. */
+  min-width: 4ch;
+}
+/* Layout: P1 thrown (left, near edge) | P1 remain (right, near round)
+ * | round (center) | P2 thrown (left, near round) | P2 remain (right,
+ * near edge). Numbers point outward toward the round indicator so
+ * the eye can pair "thrown" with its matching "remaining" for each
+ * player. */
+.shared-history-row .sh-thrown-p1 { text-align: left; }
+.shared-history-row .sh-thrown-p2 { text-align: right; color: var(--muted); }
+.shared-history-row .sh-remain {
+  font-weight: 600;
+  text-align: right;
+  min-width: 3ch;
+}
+.shared-history-row .sh-round {
+  font-weight: 700;
+  color: var(--muted);
+  min-width: 2.5ch;
+  text-align: center;
+  padding: 0 6px;
+  border-left: 1px solid var(--line);
+  border-right: 1px solid var(--line);
+}
+.shared-history-row.bust .sh-remain { color: var(--danger); }
+.shared-history-row.win  .sh-remain { color: var(--good); }
+.shared-history-row.editable { cursor: pointer; }
+.shared-history-row.editable:hover { background: var(--bg-2); }
+.shared-history-row.editable:active { background: var(--surface-2); }
+/* The last 3 rounds of the leg get red text across the whole row. */
+.shared-history-row.last3 { color: var(--danger); }
+.shared-history-row.last3 .sh-thrown { color: var(--danger); }
+.shared-history-row.last3 .sh-thrown-p2 { color: var(--danger); }
+.shared-history-row.last3 .sh-remain { color: var(--danger); }
+.shared-history-row.last3 .sh-round { color: var(--danger); }
+
+/* =================================================================
+   Cricket scorecard — tabular per-player marks per cricket target.
+   Mirrors the 4-column Scored / To Go layout from the mockup image.
+   Each row is [num | P1-scored | P1-toGo | dart | P2-scored | P2-toGo]
+   so the eye can pair scored/toGo for each player on the same row.
+   ================================================================= */
+.cricket-scorecard {
+  width: 100%;
+  max-width: var(--content-max);
+  margin: 0 auto;
+  background: var(--surface);
+  border: 1px solid var(--line);
+  border-radius: var(--radius);
+  overflow: hidden;
+}
+.cricket-scorecard-list {
+  display: flex;
+  flex-direction: column;
+}
+/* Quintile column positions match the shared-history strip for
+   visual consistency: num on far left, scored/toGo pairs around
+   the dart-count column in the middle (50%). */
+.cricket-scorecard-row {
+  display: grid;
+  grid-template-columns: 25fr 15fr 20fr 15fr 25fr;
+  gap: 6px;
+  align-items: center;
+  padding: clamp(10px, 1.4vw, 16px) clamp(10px, 1.6vw, 18px);
+  font-size: clamp(16px, 3vw, 22px);
+  border-bottom: 1px solid var(--line);
+  line-height: 1.2;
+  color: var(--text);
+}
+.cricket-scorecard-row:last-child { border-bottom: none; }
+.cricket-scorecard-row .cs-num {
+  text-align: left;
+  font-weight: 700;
+  color: var(--muted);
+}
+.cricket-scorecard-row .cs-scored {
+  text-align: center;
+  font-weight: 600;
+  font-variant-numeric: tabular-nums;
+}
+.cricket-scorecard-row .cs-togo {
+  text-align: center;
+  color: var(--muted);
+  font-variant-numeric: tabular-nums;
+}
+.cricket-scorecard-row .cs-dart {
+  text-align: center;
+  font-weight: 700;
+  color: var(--muted);
+  border-left: 1px solid var(--line);
+  border-right: 1px solid var(--line);
+  padding: 0 6px;
+}
+/* Header row — muted, uppercase, no bottom border so it doesn't
+   compete with the data rows. */
+.cricket-scorecard-row.cricket-scorecard-header {
+  min-height: 0;
+  padding: clamp(6px, 0.8vw, 10px) clamp(10px, 1.6vw, 18px);
+  font-size: clamp(11px, 1.6vw, 14px);
+  font-weight: 600;
+  color: var(--muted);
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+  background: var(--bg-2);
+}
+.cricket-scorecard-row.cricket-scorecard-header .cs-num { display: none; }
+/* Active (in-play) row — green highlight. Rows go active when at
+   least one player has marked them and neither has closed yet — i.e.
+   the row is still being competed over. */
+.cricket-scorecard-row.active {
+  background: rgba(28, 194, 139, 0.18);
+}
+.cricket-scorecard-row.active .cs-dart {
+  color: var(--accent);
+}
+.player-card {
+  background: var(--surface); border: 1px solid var(--line); border-radius: var(--radius);
+  padding: 4px 6px;
+  position: relative; transition: border-color .15s ease, transform .15s ease;
+  display: flex; flex-direction: column; justify-content: flex-start; align-items: center; gap: 0;
+  min-height: 0;
+}
+.player-card.active {
+  border-color: var(--accent);
+  border-width: 2px;
+  padding: calc(4px - 1px) calc(6px - 1px);
+}
+.player-card.winner {
+  border-color: var(--good);
+  border-width: 2px;
+  padding: calc(4px - 1px) calc(6px - 1px);
+}
+.player-card .who h3 {
+  margin: 0;
+  font-size: clamp(15px, 2.6vw, 20px);
+  font-weight: 600;
+  overflow: hidden; text-overflow: ellipsis; white-space: nowrap; min-width: 0;
+}
+.player-card .score {
+  font-size: clamp(42px, 9.5vw, 76px);
+  font-weight: 700;
+  line-height: 1;
+  letter-spacing: 1px;
+  font-variant-numeric: tabular-nums;
+  text-align: center;
+  margin: 0;
+  max-width: 100%;
+}
+.player-card .score.long {
+  font-size: clamp(30px, 6.5vw, 54px);
+}
+.player-card .last-round { display: none; }
+
+/* Per-player history row inside the card, directly under the score. */
+.player-card .card-history {
+  display: flex;
+  flex-wrap: nowrap;
+  gap: 3px;
+  justify-content: center;
+  width: 100%;
+  margin-top: 4px;
+  overflow: hidden;
+}
+.player-card .card-history .history-chip {
+  background: var(--surface-2);
+  border: 1px solid var(--line);
+  border-radius: 6px;
+  padding: 3px 5px;
+  font-size: clamp(10px, 1.6vw, 12px);
+  color: var(--text);
+  min-height: 24px;
+  line-height: 1.1;
+  cursor: default;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  flex: 1 1 auto;
+  min-width: 0;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.player-card .card-history .history-chip.editable {
+  cursor: pointer;
+  transition: background .12s ease, border-color .12s ease;
+}
+.player-card .card-history .history-chip.editable:hover,
+.player-card .card-history .history-chip.editable:focus {
+  background: var(--bg-2);
+  border-color: var(--accent);
+  outline: none;
+}
+.player-card .card-history .history-chip.more {
+  flex: 0 0 auto;
+  min-width: 22px;
+  padding: 3px 4px;
+  color: var(--muted);
+}
+.player-card .card-history .history-chip.disabled {
+  opacity: 0.6;
+}
+
+/* ---------- History modal body ---------- */
+.history-modal-body {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  max-height: 60vh;
+  overflow-y: auto;
+  padding: 4px;
+}
+
+/* ---------- Buttons ---------- */
+.player-card .badge-active {
+  background: var(--accent); color: #062018; font-size: 11px; font-weight: 700;
+  padding: 3px 8px; border-radius: 999px; flex-shrink: 0;
+}
+.player-card.winner .badge-active { background: var(--good); color: #07211a; }
+.player-card .badge-active.throwing { background: var(--accent); color: #062018; }
+
+/* Cricket grid: one compact row at the bottom of the card. */
+.player-card .cricket-grid {
+  display: grid; grid-template-columns: repeat(7, 1fr);
+  gap: 4px; width: 100%; margin-top: 6px;
+}
+.player-card .cricket-cell {
+  background: var(--bg-2); border: 1px solid var(--line); border-radius: 6px;
+  padding: 2px 2px; text-align: center;
+  display: flex; flex-direction: column; justify-content: center; align-items: center;
+  min-height: 28px;
+}
+.player-card .cricket-cell .num { font-weight: 700; font-size: 11px; line-height: 1; }
+.player-card .cricket-cell .marks { font-size: 9px; color: var(--muted); line-height: 1; margin-top: 2px; }
+.player-card .cricket-cell.closed .num { color: var(--good); }
+
+/* Clickable player card (only when not the active thrower and the
+   calc is empty). The dashed border + hover state invite interaction. */
+.player-card.clickable {
+  border-style: dashed;
+  opacity: 0.85;
+  transition: opacity .12s ease, border-color .12s ease, transform .06s ease;
+}
+.player-card.clickable:hover,
+.player-card.clickable:focus {
+  opacity: 1;
+  border-color: var(--accent);
+  transform: translateY(-1px);
+  outline: none;
+}
+.player-card.clickable:active { transform: translateY(0); }
+
+/* Cricket grid */
+.cricket-grid {
+  margin-top: 10px; display: grid; grid-template-columns: repeat(7, 1fr); gap: 4px;
+}
+.cricket-cell {
+  background: var(--bg-2); border: 1px solid var(--line); border-radius: 8px;
+  padding: 6px 4px; text-align: center; position: relative; min-height: 46px;
+  display: flex; flex-direction: column; justify-content: center; align-items: center;
+}
+.cricket-cell .num { font-weight: 700; font-size: 14px; }
+.cricket-cell .marks { font-size: 11px; color: var(--muted); margin-top: 2px; display: flex; gap: 2px; }
+.cricket-cell.closed { background: #14201a; border-color: #1f3a2c; }
+.cricket-cell.closed .num { color: var(--good); }
+.cricket-cell .slash {
+  position: absolute; top: 50%; left: 0; right: 0; height: 2px;
+  background: var(--danger); transform: rotate(-22deg); transform-origin: center;
+  pointer-events: none;
+}
+
+/* ---------- Entry pad ---------- */
+.entry {
+  position: sticky; bottom: 0; background: linear-gradient(180deg, #0b0f17ee, #0b0f17);
+  border-top: 1px solid var(--line); padding: 12px; margin-top: 16px;
+  border-radius: var(--radius) var(--radius) 0 0;
+}
+.entry .turn-info {
+  display: flex; justify-content: space-between; align-items: center;
+  font-size: 13px; color: var(--muted); margin-bottom: 8px;
+}
+.entry .turn-info .current-dart {
+  font-size: 14px; color: var(--text);
+}
+.dart-list {
+  display: flex; gap: 8px; margin-bottom: 10px;
+}
+.dart-list .dart {
+  flex: 1; background: var(--surface-2); border: 1px solid var(--line);
+  border-radius: 10px; padding: 10px 6px; text-align: center; font-weight: 700; font-size: 18px;
+  display: flex; flex-direction: column; gap: 2px;
+}
+.dart-list .dart .small { font-size: 11px; color: var(--muted); font-weight: 500; }
+.dart.empty { color: var(--muted); }
+
+.entry .keypad {
+  display: grid; grid-template-columns: repeat(5, 1fr); gap: 8px;
+}
+.keypad button {
+  background: var(--surface); border: 1px solid var(--line); border-radius: 10px;
+  padding: 12px 0; font-size: 16px; font-weight: 700;
+}
+.keypad button:hover { background: var(--surface-2); }
+.keypad button.special { background: #1a2231; }
+.keypad button.bull { background: #2a1a1f; border-color: #5a2a32; color: #ff8a99; }
+.keypad button.miss { background: #1a1a1a; color: var(--muted); }
+.keypad button.dbl { color: var(--warn); }
+.keypad button.tpl { color: var(--accent); }
+
+/* ---------- Modal / sheets ---------- */
+.sheet {
+  position: fixed; inset: 0; background: rgba(0,0,0,.6);
+  display: none; align-items: flex-end; justify-content: center; z-index: 30;
+}
+.sheet.open { display: flex; }
+.sheet .panel {
+  background: var(--bg-2); border-top-left-radius: 18px; border-top-right-radius: 18px;
+  border: 1px solid var(--line); border-bottom: none;
+  width: 100%; max-width: 720px; padding: 16px; max-height: 86dvh; overflow-y: auto;
+}
+.sheet .panel h3 { margin: 0 0 8px; }
+.sheet .panel .row { display: flex; gap: 8px; margin: 6px 0; }
+.sheet .panel .qr {
+  background: #fff; padding: 12px; border-radius: 12px; display: flex; justify-content: center; margin: 8px auto;
+}
+
+/* ---------- Online room ---------- */
+.online-grid {
+  display: grid; gap: 12px; grid-template-columns: 1fr;
+}
+@media (min-width: 720px) { .online-grid { grid-template-columns: 1fr 1fr; } }
+
+.copy {
+  background: var(--bg-2); border: 1px solid var(--line); border-radius: 10px;
+  padding: 10px 12px; font-family: ui-monospace, "SF Mono", Consolas, monospace; font-size: 13px;
+  word-break: break-all;
+}
+
+.status-pill {
+  display: inline-flex; align-items: center; gap: 6px; font-size: 12px;
+  padding: 4px 10px; border-radius: 999px; background: var(--surface-2); border: 1px solid var(--line); color: var(--muted);
+}
+.status-pill .dot { width: 8px; height: 8px; border-radius: 50%; background: var(--muted); }
+.status-pill.online .dot { background: var(--good); box-shadow: 0 0 8px #5dd39e88; }
+.status-pill.connecting .dot { background: var(--warn); animation: pulse 1.2s infinite; }
+.status-pill.offline .dot { background: var(--danger); }
+@keyframes pulse { 0%,100% { opacity: 1 } 50% { opacity: .4 } }
+
+/* ---------- Misc ---------- */
+.toast {
+  position: fixed; left: 50%; transform: translateX(-50%);
+  bottom: 80px; background: var(--surface-2); border: 1px solid var(--line);
+  color: var(--text); padding: 10px 14px; border-radius: 10px; box-shadow: var(--shadow);
+  z-index: 100; opacity: 0; pointer-events: none; transition: opacity .2s ease, transform .2s ease;
+}
+.toast.show { opacity: 1; transform: translate(-50%, -6px); }
+
+/* Debug overlay label — shown when the user toggles "Show element
+   labels on hover" in Settings. Anchored to the cursor position and
+   shows the hovered element's tag/class/id plus its ancestor chain
+   (up to 3 parents) and computed width/height + font-size. Mimics a
+   lightweight DevTools inspector breadcrumb. */
+.debug-overlay-label {
+  position: fixed;
+  top: 0; left: 0;
+  background: rgba(8, 14, 22, 0.95);
+  color: #b8f5d2;
+  border: 1px solid var(--accent);
+  border-radius: 6px;
+  padding: 6px 10px;
+  font-family: ui-monospace, "SF Mono", Consolas, monospace;
+  font-size: 12px;
+  line-height: 1.45;
+  white-space: pre;
+  pointer-events: none;
+  z-index: 9999;
+  opacity: 0;
+  transition: opacity 0.1s ease;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.35);
+  max-width: 420px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.row-flex { display: flex; gap: 8px; align-items: center; }
+.muted { color: var(--muted); }
+.small { font-size: 12px; }
+.divider { height: 1px; background: var(--line); margin: 12px 0; }
+.spacer { flex: 1; }
+
+.history-item {
+  display: grid; grid-template-columns: 1fr auto auto; gap: 8px; padding: 8px 10px;
+  border-bottom: 1px solid var(--line); font-size: 14px;
+}
+.history-item:last-child { border-bottom: none; }
+.history-item .who { font-weight: 600; }
+.history-item .what { color: var(--muted); }
+.history-item .delta { font-variant-numeric: tabular-nums; }
+
+footer.app-footer {
+  padding: 16px; text-align: center; color: var(--muted); font-size: 12px;
+}
+footer.app-footer .version {
+  font-family: ui-monospace, "SF Mono", Consolas, monospace;
+  font-size: 11px;
+  padding: 1px 6px;
+  border-radius: 999px;
+  background: var(--surface-2);
+  border: 1px solid var(--line);
+  color: var(--text);
+}
+
+/* =================================================================
+   Calculator-style score entry — 4×3 numpad.
+   Responsive: scales with viewport; works in portrait AND landscape
+   on tablets and phones because tiles use flex/grid fractions, not
+   pixel sizes.
+   ================================================================= */
+.calc {
+  display: grid;
+  /* Three explicit rows: display (auto), hint (auto), pad-wrap (1fr
+     — fills whatever vertical space is left). */
+  grid-template-rows: auto auto 1fr;
+  gap: 10px;
+  background: #1a1f2a;
+  border: 1px solid var(--line);
+  border-radius: var(--radius);
+  padding: 12px;
+  box-shadow: var(--shadow);
+  /* Scales with viewport: small phones get ~280px, tablets ~600px,
+     4K caps at 720px. Same width as the scoreboard (--content-max). */
+  width: 100%;
+  max-width: var(--content-max);
+  margin: 0 auto;
+  /* Self-size: subtract header (57) + footer (50) + main padding-top (16)
+     + main padding-bottom (16) + toolbar (~71) + scoreboard (~124) +
+     their margins (~24) ≈ 358px. Floor + cap so the calc stays usable
+     on every viewport. */
+  height: min(calc(100dvh - 280px), 700px);
+  min-height: 200px;
+  overflow: hidden;
+}
+/* On very short viewports (e.g. 1024×600 landscape tablet held sideways)
+   the display eats too much vertical space. Hide it so the numpad gets
+   the room — the active player card already shows who's throwing, and
+   the hint text below the numpad still confirms the entered value. */
+@media (max-height: 640px) {
+  .calc-action-btn { min-height: 38px; padding: 2px; }
+  .calc-btn        { min-height: 36px; padding: 2px 0; }
+  .calc-fast-btn   { min-height: 38px; padding: 2px; }
+}
+@media (max-height: 760px) {
+  /* On viewports under 760px tall, the action / numpad / fast
+     buttons must stay compact so the bottom row clears the
+     viewport. Container queries at >=720 inline-size can still
+     fire on these tall-but-narrow viewports (e.g. a 1280×720
+     tablet in landscape), so we override here. */
+  .calc-btn        { padding: 0.125em 0 !important; }
+  .calc-fast-btn   { padding: 0.125em !important; }
+  .calc-action-btn { padding: 0.125em !important; }
+  .calc-display    { padding: 0.0625em 0.75em !important; }
+}
+@media (max-height: 640px) {
+  /* !important versions — override the base `.calc-btn` /
+     `.calc-action-btn` / `.calc-display` rules which set larger
+     touch targets. The 4.5vh min-height (= ~28px on a 620px
+     viewport) keeps the bottom row visible while ensuring the
+     action row (power / = / …), the entered-number display and
+     the numpad buttons are all the same height — visually
+     consistent, no wasted vertical space.
+
+     max-height acts as a hard cap so container-query padding
+     bumps (10px on .calc-action-btn, clamp(10px, 1.8vw, 22px)
+     on .calc-btn) can't blow the button past the 4.5vh target.
+     The button visually settles at 4.5vh tall.
+
+     Font sizes and padding use % (relative to parent root
+     font-size, 16px) rather than hardcoded px so they scale with
+     user / device text-size preferences. */
+  .calc-action-btn { min-height: 4.5vh !important; max-height: 4.5vh !important; padding: 0.125em !important; font-size: 125% !important; }
+  .calc-btn        { min-height: 4.5vh !important; max-height: 4.5vh !important; padding: 0.125em 0 !important; font-size: 125% !important; }
+  .calc-fast-btn   { min-height: 4.5vh !important; max-height: 4.5vh !important; padding: 0.125em !important; font-size: 100% !important; }
+  .calc-display    { min-height: 4.5vh !important; max-height: 4.5vh !important; padding: 0.0625em 0.75em !important; }
+  .calc-entered    { font-size: 125% !important; line-height: 1 !important; letter-spacing: 0.0625em !important; }
+  .calc-pad        { gap: 4px !important; grid-auto-rows: 4.5vh !important; }
+  .calc-actions    { grid-auto-rows: 4.5vh !important; }
+}
+.calc-display {
+  background: #0d1117;
+  border: 1px solid #2a3344;
+  border-radius: 10px;
+  /* Very tight vertical padding so the display stays ~29 % shorter
+     than it was when it also hosted the running-total hint line.
+     The entered number still gets full vertical room. */
+  padding: 1px 12px;
+  text-align: right;
+  font-family: ui-monospace, "SF Mono", Consolas, monospace;
+  min-height: 0;
+}
+.calc-entered {
+  color: var(--text);
+  /* Bigger than before — the entered number is now the only thing in
+     the display, so we can give it the full vertical room. */
+  font-size: clamp(32px, 7vw, 52px);
+  font-weight: 700;
+  line-height: 1.05;
+  letter-spacing: 2px;
+  word-break: break-all;
+}
+.calc-running {
+  display: none;
+}
+/* Half-height action row: 3 icon-only buttons that replace the
+   removed hint line. Each button is half the height of a numpad
+   row, and the three share the calc width. */
+.calc-actions {
+  display: grid;
+  grid-template-columns: 1fr 1fr 1fr;
+  gap: clamp(6px, 1.5vw, 10px);
+  width: 100%;
+  /* Sits between the display and the numpad. The numpad's grid
+     has 4 equal rows, so the action row is sized to roughly half
+     a numpad row. */
+  flex: 0 0 auto;
+}
+.calc-action-btn {
+  flex: 1; background: #232c3d; border: 1px solid #34405a; color: var(--text);
+  border-radius: 10px; display: flex; align-items: center; justify-content: center;
+  /* Font scales with viewport height (vh) for a predictable
+     percentage-of-frame feel. */
+  font-size: clamp(16px, 4.2vh, 28px); font-weight: 700; line-height: 1;
+  user-select: none; -webkit-tap-highlight-color: transparent;
+  min-height: 48px;
+  padding: 8px 4px;
+  transition: background .12s ease, transform .06s ease;
+}
+.calc-action-btn:hover { background: #2c374f; }
+.calc-action-btn:active { transform: translateY(1px); }
+.calc-action-btn.calc-action-exit    { color: var(--danger); }
+.calc-action-btn.calc-action-setscore{ color: var(--accent); }
+.calc-action-btn.calc-action-morecmds{ color: var(--text); }
+
+.calc-hint {
+  color: var(--muted);
+  font-size: clamp(11px, 2.4vw, 13px);
+  line-height: 1.4;
+  padding: 0 2px;
+}
+
+.calc-pad {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  /* 4 equal-height rows. Fill the calc-pad-wrap. */
+  grid-auto-rows: 1fr;
+  gap: clamp(6px, 1.5vw, 10px);
+  flex: 1 1 auto;
+  min-height: 0;
+  min-width: 0;
+  /* Pad the pad-wrap gap and padding so tiles stay clickable. */
+  height: 100%;
+}
+
+.calc-btn {
+  background: #232c3d;
+  border: 1px solid #34405a;
+  border-radius: 12px;
+  color: var(--text);
+  font-family: ui-monospace, "SF Mono", monospace;
+  font-weight: 700;
+  /* Font scales with viewport height (vh) for a predictable
+     percentage-of-frame feel. Max ~22px keeps text inside the
+     48px-min-height button on tablet/desktop. */
+  font-size: clamp(14px, 3.4vh, 22px);
+  padding: 6px 0;
+  min-height: 48px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  user-select: none;
+  -webkit-tap-highlight-color: transparent;
+  min-width: 0;
+  overflow: hidden;
+}
+.calc-btn:hover { background: #2c374f; }
+.calc-btn:active { transform: translateY(1px); background: #2c374f; }
+
+.calc-btn.num    { background: #1f2738; }
+.calc-btn.back   { background: #2a1a1f; border-color: #5a2a32; color: #ff8a99; }
+.calc-btn.enter  {
+  background: var(--accent);
+  border-color: var(--accent);
+  color: #062018;
+}
+.calc-btn.enter:hover { background: #2cd49a; }
+.calc-btn.enter:active { background: #2cd49a; }
+
+/* On really small phones in portrait, tighten the gap so 4 rows fit. */
+@media (max-width: 380px) {
+  .calc { padding: 8px; gap: 8px; }
+  .calc-pad { gap: 6px; }
+  .calc-fast-btn { padding: 6px 4px; }
+}
+
+/* Fast-score buttons.
+   On wide screens (default) two columns of 4 buttons flank the
+   4×3 numpad: smaller numbers on the LEFT, larger on the RIGHT.
+   On narrow screens the side columns are hidden and a row of 8
+   buttons (wrapping to 4+4 on phones) appears UNDER the pad. */
+
+/* Phone fallback row: hidden by default, shown only on narrow screens. */
+.calc-fast-row {
+  display: none;
+  width: 100%;
+  grid-template-columns: repeat(8, 1fr);
+  gap: clamp(4px, 1vw, 8px);
+}
+
+/* Side columns: hidden on narrow screens, shown on wider screens.
+   Each side is a vertical column of 4 buttons flanking the numpad
+   (smaller numbers left, larger numbers right). */
+.calc-pad-wrap {
+  display: flex;
+  align-items: stretch;
+  justify-content: center;
+  gap: clamp(6px, 1.2vw, 10px);
+  width: 100%;
+  /* Fill the remaining vertical space in the calculator. */
+  flex: 1 1 auto;
+  min-height: 0;
+}
+.calc-fast {
+  display: none;          /* hidden on narrow screens */
+  flex-direction: column;
+  gap: clamp(4px, 1vw, 8px);
+  flex: 0 0 auto;
+  width: clamp(56px, 9vw, 96px);
+}
+/* Side favorites + numpad in one row needs ~480px minimum (4 buttons
+   of 40px + 1 column of 40px on each side + gaps). Show side columns
+   from 600px wide; below that, fall through to the below-the-pad
+   phone row which fits in any width. */
+@media (min-width: 600px) {
+  /* Show the side-fast-score columns alongside the numpad from
+     600px wide (was 700px). Mobile-portrait devices like a
+     600×800 tablet in portrait orientation get the same
+     side-by-side layout as landscape phones. Sub-600px (small
+     phones in portrait) fall through to the phoneRow below
+     the numpad. The two side columns (clamp(56px, 9vw, 96px))
+     each take ~56px, leaving ~480px for the 3-column numpad
+     on a 600px viewport — enough for tappable buttons. */
+  .calc-fast { display: flex; }
+  .calc-pad { flex: 1 1 auto; min-width: 0; aspect-ratio: auto; }
+}
+.calc-fast-btn {
+  font-family: inherit;
+  /* Font scales with viewport height. Same idea as .calc-btn. */
+  font-size: clamp(13px, 2.6vh, 20px);
+  font-weight: 600;
+  padding: 6px 4px;
+  border-radius: var(--radius);
+  border: 1px solid #2a5d3a;
+  background: #143d24;
+  color: #6ee7a8;
+  transition: background 0.1s, transform 0.05s;
+  width: 100%;
+  flex: 1 1 0;
+  min-height: 48px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+.calc-fast-btn:hover { background: #1c5232; }
+.calc-fast-btn:active { background: #1c5232; transform: translateY(1px); }
+
+/* Small-tablet portrait (600×800 and similar): shrink the numpad +
+   fast-score row so the entire calc fits in 800px height alongside
+   the toolbar + scoreboard + footer. Numpad rows 40px (was 48),
+   fast-score rows 40px, action row 44px. Still touch-tappable,
+   just below the 48px comfort minimum. Placed AFTER the base
+   .calc-btn / .calc-fast-btn / .calc-action-btn rules so it wins
+   on source order for matching viewports. */
+@media (max-width: 599px) {
+  /* Single row of 8 chips, smaller height — fits below the numpad
+     on phone-portrait screens where side columns can't fit. */
+  .calc-fast-row { display: grid; grid-template-columns: repeat(8, 1fr); gap: 4px; }
+  .calc-pad        { gap: 4px; }
+  .calc-btn        { min-height: 40px; padding: 4px 0; }
+  .calc-fast-btn   { min-height: 32px; padding: 2px 0; font-size: clamp(11px, 2.4vh, 16px); }
+  .calc-action-btn { min-height: 40px; padding: 4px; }
+  .calc-display    { padding: 4px 8px; }
+  .calc-entered    { font-size: 22px; }
+  .calc-running    { font-size: 10px; margin-top: 2px; }
+}
+
+/* =================================================================
+   Login screen
+   ================================================================= */
+.login-wrap {
+  max-width: 380px; margin: 8vh auto 0;
+  background: var(--surface); border: 1px solid var(--line);
+  border-radius: var(--radius); padding: 22px; box-shadow: var(--shadow);
+}
+.login-wrap h2 { margin: 0 0 6px; }
+.login-wrap p { color: var(--muted); font-size: 13px; margin: 0 0 16px; }
+.login-wrap .field { margin-bottom: 12px; }
+.login-tabs { display: flex; gap: 0; border-bottom: 1px solid var(--line); margin-bottom: 14px; }
+.login-tabs button {
+  flex: 1; background: transparent; border: none; color: var(--muted);
+  padding: 10px; font-weight: 600; border-bottom: 2px solid transparent;
+}
+.login-tabs button.active { color: var(--text); border-color: var(--accent); }
+.login-foot { margin-top: 12px; color: var(--muted); font-size: 12px; text-align: center; }
+
+/* =================================================================
+   Competition screens: bracket, league, admin
+   ================================================================= */
+.admin-grid {
+  display: grid; grid-template-columns: 1fr; gap: 12px;
+}
+@media (min-width: 720px) { .admin-grid { grid-template-columns: 1fr 1fr; } }
+
+.user-row {
+  display: grid; grid-template-columns: 1fr auto auto; gap: 10px; align-items: center;
+  background: var(--bg-2); border: 1px solid var(--line); border-radius: 10px;
+  padding: 8px 12px; margin-bottom: 6px;
+}
+.user-row .name { font-weight: 600; }
+.user-row .role-badge {
+  font-size: 11px; padding: 2px 8px; border-radius: 999px;
+  background: #243049; color: #c8d3ea;
+}
+.user-row .role-badge.admin { background: #2a1a1f; color: var(--accent-2); }
+
+/* Scrollable grid of player picker rows (max ~10 rows visible, then scroll). */
+#pick-players {
+  max-height: 360px;
+  overflow-y: auto;
+  border: 1px solid var(--line);
+  border-radius: 10px;
+  padding: 8px;
+  background: rgba(255,255,255,0.02);
+  margin-top: 6px;
+}
+.picker-row { display: grid; grid-template-columns: 24px 1fr; gap: 8px; align-items: center; }
+
+/* Participants grid — picked players with red ✕ delete buttons. */
+.participants-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(180px, 1fr));
+  gap: 8px;
+  margin: 8px 0;
+}
+.participant-card {
+  position: relative;
+  background: var(--bg-2);
+  border: 1px solid var(--line);
+  border-radius: 10px;
+  padding: 8px 28px 8px 12px;
+  font-size: 14px;
+  min-height: 56px;
+}
+.participant-card .name { font-weight: 600; }
+.participant-card .small.muted { margin-top: 2px; font-size: 12px; }
+.participant-delete {
+  position: absolute;
+  top: 4px;
+  right: 4px;
+  width: 24px;
+  height: 24px;
+  padding: 0;
+  border: 1px solid transparent;
+  background: transparent;
+  color: #ff5577;
+  font-size: 14px;
+  font-weight: 700;
+  border-radius: 6px;
+  line-height: 1;
+}
+.participant-delete:hover {
+  background: rgba(255, 85, 119, 0.15);
+  border-color: #ff5577;
+}
+
+/* Bracket */
+.bracket {
+  overflow-x: auto; padding: 10px 0;
+}
+.bracket-grid {
+  display: grid; gap: 10px;
+  grid-auto-flow: column;
+  grid-auto-columns: minmax(180px, 1fr);
+}
+.bracket-round { display: flex; flex-direction: column; justify-content: space-around; gap: 10px; }
+.bracket-round h4 { margin: 0 0 4px; font-size: 12px; text-transform: uppercase; letter-spacing: 1px; color: var(--muted); text-align: center; }
+.bracket-match {
+  background: var(--surface); border: 1px solid var(--line); border-radius: 10px;
+  padding: 8px 10px; display: grid; gap: 4px;
+}
+.bracket-match.ready { border-color: var(--accent); }
+.bracket-match.complete { opacity: .85; }
+.bracket-match .slot {
+  display: grid; grid-template-columns: 1fr auto; gap: 6px; padding: 4px 6px;
+  border-radius: 6px; background: var(--bg-2);
+}
+.bracket-match .slot.winner { background: #14241c; color: var(--good); font-weight: 700; }
+.bracket-match .slot.loser { color: var(--muted); }
+.bracket-match .slot .nm { font-size: 13px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.bracket-match .slot .sc { font-variant-numeric: tabular-nums; font-weight: 700; font-size: 13px; }
+.bracket-match .meta { font-size: 10px; color: var(--muted); text-transform: uppercase; letter-spacing: .8px; }
+
+/* League table */
+.league-table {
+  width: 100%; border-collapse: collapse; background: var(--surface);
+  border: 1px solid var(--line); border-radius: var(--radius); overflow: hidden;
+}
+.league-table th, .league-table td {
+  padding: 8px 10px; text-align: left; border-bottom: 1px solid var(--line); font-size: 14px;
+}
+.league-table th { background: var(--bg-2); font-size: 12px; text-transform: uppercase; color: var(--muted); letter-spacing: .8px; }
+.league-table td.num { text-align: right; font-variant-numeric: tabular-nums; }
+.league-table tr:last-child td { border-bottom: none; }
+.league-table tr.you td { background: #11221a; }
+
+/* Settings panels */
+.kv {
+  display: grid; grid-template-columns: 1fr auto; gap: 8px; align-items: center;
+  background: var(--bg-2); border: 1px solid var(--line); border-radius: 10px;
+  padding: 8px 12px; margin-bottom: 6px;
+}
+.kv .lbl { font-size: 13px; color: var(--muted); }
+.kv .val { font-weight: 600; font-size: 14px; }
+
+.empty-state {
+  border: 1px dashed var(--line); border-radius: var(--radius); padding: 24px;
+  text-align: center; color: var(--muted);
+}
+
+/* =================================================================
+   Container-query responsive breakpoints (live at the END so they
+   win on source order against same-specificity base rules above).
+   These react to the `main` element's inline size via
+   `container-type: inline-size` + `container-name: app`. So a 4K
+   monitor with the calc full-width gets bigger fonts, while the
+   same calc in a narrow side panel gets the compact layout.
+   ================================================================= */
+/* Landscape orientation — bump the vh-scaled font percentage a bit
+   so landscape buttons stay readable when the calc is short and wide. */
+@media (orientation: landscape) {
+  .calc-btn        { font-size: clamp(14px, 4.4vh, 26px); }
+  .calc-action-btn { font-size: clamp(16px, 5vh, 32px); }
+  .calc-fast-btn   { font-size: clamp(13px, 3.4vh, 24px); }
+}
+@container (min-width: 720px) {
+  /* Comfortable on FHD / 4K / wide tablets */
+  .calc { padding: 18px; gap: 14px; }
+  .calc-display { padding: 3px 16px; }
+  .calc-entered { font-size: clamp(36px, 5.5vw, 52px); }
+  /* .calc-btn / .calc-fast-btn / .calc-action-btn use container-query
+     `cqh` units (see base rules above) for proportional font sizing,
+     so we don't override font-size here. Just nudge padding.
+
+     !important is needed because the @media (max-height: 640px)
+     rule lower in the file sets padding: 0.125em !important on
+     buttons to keep the bottom row of the numpad visible on
+     short viewports, and container queries run later in source
+     order so they win over normal media-query declarations.
+     The compact 720px+ layout overrides the small-touch rules
+     here. */
+  .calc-btn        { padding: clamp(10px, 1.8vw, 22px) 0 !important; }
+  .calc-fast-btn   { padding: clamp(10px, 1.5vw, 18px) 4px !important; }
+  .calc-action-btn { padding: 10px 4px !important; }
+  .player-card { padding: 10px 12px; }
+  .player-card.active { padding: calc(10px - 1px) calc(12px - 1px); }
+  .player-card.winner { padding: calc(10px - 1px) calc(12px - 1px); }
+  .player-card .who h3 { font-size: clamp(20px, 2.4vw, 28px); }
+  .player-card .score { font-size: clamp(44px, 6vw, 80px); }
+  .player-card .score.long { font-size: clamp(32px, 4vw, 56px); }
+  .player-card .last-round { font-size: clamp(12px, 1.8vw, 15px); }
+}
+@container (min-width: 1080px) {
+  /* Generous on desktop / 4K */
+  .calc { padding: 22px; gap: 16px; }
+  .calc-display { padding: 2px 18px; }
+  .calc-entered { font-size: clamp(36px, 4.2vw, 48px); }
+  /* Buttons keep cqh-based font from base rules (proportional). */
+  .calc-btn        { padding: clamp(14px, 1.5vw, 26px) 0; }
+  .calc-fast-btn   { padding: clamp(12px, 1.2vw, 20px) 4px; }
+  .calc-action-btn { padding: 14px 4px; }
+  .player-card { padding: 12px 14px; }
+  .player-card.active { padding: calc(12px - 1px) calc(14px - 1px); }
+  .player-card.winner { padding: calc(12px - 1px) calc(14px - 1px); }
+  .player-card .score { font-size: clamp(52px, 5vw, 100px); }
+  .player-card .score.long { font-size: clamp(36px, 3.5vw, 64px); }
+  .player-card .last-round { font-size: clamp(13px, 1.4vw, 16px); }
+}
+
+/* =================================================================
+   Modal dialog (used for Save / Discard / More Commands).
+   ================================================================= */
+.modal-backdrop {
+  position: fixed; inset: 0;
+  background: rgba(0, 0, 0, 0.55);
+  display: flex; align-items: center; justify-content: center;
+  z-index: 100;
+  padding: 16px;
+}
+.modal-panel {
+  background: var(--surface);
+  border: 1px solid var(--line);
+  border-radius: var(--radius);
+  padding: 18px;
+  /* Wider so the more-commands rows can show label + desc comfortably. */
+  min-width: min(520px, 100%);
+  max-width: min(620px, 100%);
+  box-shadow: 0 20px 60px rgba(0, 0, 0, 0.5);
+}
+.modal-title { margin: 0 0 8px; font-size: clamp(20px, 2.8vw, 24px); }
+.modal-body  { margin: 0 0 14px; color: var(--text); line-height: 1.45; font-size: 15px; }
+.modal-actions { display: flex; gap: 8px; justify-content: flex-end; flex-wrap: wrap; }
+.modal-actions .btn {
+  /* Touch target: 48px so the modal buttons are tappable. */
+  min-width: 110px;
+  min-height: 48px;
+  font-size: 15px;
+  padding: 12px 16px;
+}
+
+.cmd-list { display: grid; gap: 6px; }
+.cmd-row {
+  display: block; width: 100%;
+  background: var(--bg-2); border: 1px solid var(--line);
+  border-radius: 10px;
+  /* Touch target: 48px minimum so every command is tappable. */
+  padding: 12px 14px; min-height: 56px;
+  text-align: left;
+  color: var(--text);
+  transition: background .12s ease, border-color .12s ease;
+}
+.cmd-row:hover { background: var(--surface-2); border-color: var(--accent); }
+.cmd-row .cmd-label { font-size: clamp(16px, 2.2vw, 18px); font-weight: 600; }
+.cmd-row .cmd-desc  { font-size: clamp(12px, 1.6vw, 14px); color: var(--muted); margin-top: 2px; }
+
+.stats-panel { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
+.stats-card  {
+  background: var(--bg-2); border: 1px solid var(--line);
+  border-radius: 8px; padding: 10px 12px;
+}
+.stats-card h4 { margin: 0 0 6px; font-size: clamp(15px, 2vw, 17px); }
+
+/* ----- Stats screen (per-player, per-scope) ----- */
+.stats-player-row {
+  display: flex; flex-wrap: wrap; gap: 6px;
+  margin: 8px 0 12px;
+}
+.stats-player-chip {
+  background: var(--bg-2);
+  border: 1px solid var(--line);
+  border-radius: 999px;
+  padding: 6px 12px;
+  color: var(--fg);
+  font-size: clamp(14px, 1.8vw, 16px);
+}
+.stats-player-chip.selected {
+  background: var(--accent);
+  color: var(--bg);
+  border-color: var(--accent);
+}
+.stats-heading { margin: 18px 0 10px; font-size: clamp(20px, 2.6vw, 24px); }
+.stats-block { margin-bottom: 14px; }
+.stats-block h4 { margin: 0 0 6px; font-size: clamp(17px, 2.2vw, 20px); }
+.stats-summary { color: var(--muted); font-size: clamp(14px, 1.8vw, 16px); margin-bottom: 10px; }
+.stats-table { width: 100%; border-collapse: collapse; font-size: clamp(15px, 1.9vw, 17px); }
+.stats-table td, .stats-table th {
+  padding: 6px 8px;
+  border-bottom: 1px solid var(--line);
+  text-align: left;
+}
+.stats-table td.stats-value { text-align: right; font-variant-numeric: tabular-nums; }
+.stats-table tr.stats-section-row th {
+  background: var(--bg-2);
+  color: var(--accent);
+  font-size: 12px;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  padding: 6px 6px 4px;
+  border-bottom: 1px solid var(--line);
+}
+
+/* ----- Google sign-in row on Competitions screen ----- */
+.comp-auth-row {
+  display: flex; align-items: center; justify-content: space-between;
+  gap: 12px;
+  padding: 10px 12px;
+  margin: 8px 0 12px;
+  background: var(--bg-2);
+  border: 1px solid var(--line);
+  border-radius: 8px;
+}
+.comp-user-badge {
+  display: inline-flex; align-items: center; gap: 8px;
+  font-size: 14px;
+}
+.comp-user-avatar {
+  width: 24px; height: 24px;
+  border-radius: 50%;
+  object-fit: cover;
+}
+
+/* Resume banner on the menu — auto-saves surface here on next boot. */
+.resume-banner {
+  display: flex; align-items: center; justify-content: space-between;
+  gap: 12px;
+  background: var(--surface); border: 1px solid var(--accent);
+  border-radius: var(--radius);
+  padding: 12px 16px; margin-bottom: 16px;
+  transition: background .12s ease;
+}
+.resume-banner:hover { background: var(--surface-2); }
+.resume-banner strong { display: block; margin-bottom: 2px; }
+
+/* Final override (must be source-order LAST) — on viewports under
+   760px tall the action/numpad/fast buttons must stay compact so
+   the bottom row clears the viewport, regardless of container
+   inline-size. Container queries at >=720 inline-size can still
+   fire on these tall-but-narrow viewports (e.g. a 1280×720 tablet
+   in landscape), so we override once more here at the bottom of
+   the file. Pad with em so it scales with the root font-size. */
+@media (max-height: 760px) {
+  .calc-btn        { padding: 0.125em 0 !important; }
+  .calc-fast-btn   { padding: 0.125em !important; }
+  .calc-action-btn { padding: 0.125em !important; }
+  .calc-display    { padding: 0.0625em 0.75em !important; }
+}
+
