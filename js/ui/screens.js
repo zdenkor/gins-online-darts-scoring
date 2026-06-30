@@ -978,7 +978,15 @@ function renderGame(router, params) {
   let calc = null;
 
   // Per-dart buffer for x01 double-in / triple-in / triple-out / master-out variants.
-  const x01DartBuffer = [];
+    const x01DartBuffer = [];
+
+    // History-edit mode. When set, the calc buffer is pre-loaded with
+    // the values of an existing throw and the next Commit overwrites
+    // that entry in `game.rawDarts` instead of appending a new one.
+    // Shape: { idx, type: 'total' | 'darts' | 'segments' } where idx is
+    // the position in `game.rawDarts`. `null` means we're entering a
+    // new throw normally.
+    let editingHistoryEntry = null;
 
   // Click on a non-active player card → switch active thrower. Only
   // legal at the start of a turn (no darts entered yet), otherwise
@@ -1099,30 +1107,47 @@ function renderGame(router, params) {
           + (isActive ? ' active' : ''),
       });
       // P1 (left player) thrown + remaining, then round dart-count in
+      // P1 (left player) thrown + remaining, then round dart-count in
       // the middle, then P2 (right player) thrown + remaining. The
       // shared history mirrors the scoreboard layout: P1 on the
       // left, P2 on the right, round dart-count in the middle.
+      //
+      // Editing highlight: if `editingHistoryEntry` matches this
+      // row's P1 or P2 entry, mark the row + the specific cell
+      // with `editing` / `editing-cell` so the user can see which
+      // number is being edited (yellow tint + pulsing inset border).
+      const e1Idx = e1 ? (game.rawDarts || []).indexOf(e1) : -1;
+      const e2Idx = e2 ? (game.rawDarts || []).indexOf(e2) : -1;
+      const e1Editing = e1 && editingHistoryEntry
+        && editingHistoryEntry.idx === e1Idx;
+      const e2Editing = e2 && editingHistoryEntry
+        && editingHistoryEntry.idx === e2Idx;
+      if (e1Editing || e2Editing) {
+        row.classList.add('editing');
+      }
       row.appendChild(el('span', {
         class: 'sh-thrown sh-thrown-p1'
           + (e1 && e1.bust ? ' bust' : '')
-          + (e1 && (e1.isCheckout || e1.isLegWin) ? ' win' : ''),
+          + (e1 && (e1.isCheckout || e1.isLegWin) ? ' win' : '')
+          + (e1Editing ? ' editing-cell' : ''),
       }, e1 ? formatThrownDarts(e1) : '—'));
       row.appendChild(el('span', {
-        class: 'sh-remain sh-remain-p1'
-          + (e1 && e1.bust ? ' bust' : ''),
-      }, e1 ? (e1.bust ? 'BUST' : String(computeRemaining(p1.name, e1, entriesByRound))) : '—'));
+              class: 'sh-remain sh-remain-p1'
+                + (e1 && e1.bust ? ' bust' : ''),
+            }, e1 ? (e1.bust ? 'BUST' : String(computeRemaining(p1.name, e1, entriesByRound))) : '—'));
       // Round dart-count in the middle.
       row.appendChild(el('span', { class: 'sh-round' }, String(round * 3)));
       // P2 thrown + remaining.
       row.appendChild(el('span', {
         class: 'sh-thrown sh-thrown-p2'
           + (e2 && e2.bust ? ' bust' : '')
-          + (e2 && (e2.isCheckout || e2.isLegWin) ? ' win' : ''),
+          + (e2 && (e2.isCheckout || e2.isLegWin) ? ' win' : '')
+          + (e2Editing ? ' editing-cell' : ''),
       }, e2 ? formatThrownDarts(e2) : '—'));
       row.appendChild(el('span', {
-        class: 'sh-remain sh-remain-p2'
-          + (e2 && e2.bust ? ' bust' : ''),
-      }, e2 ? (e2.bust ? 'BUST' : String(computeRemaining(p2.name, e2, entriesByRound))) : '—'));
+              class: 'sh-remain sh-remain-p2'
+                + (e2 && e2.bust ? ' bust' : ''),
+            }, e2 ? (e2.bust ? 'BUST' : String(computeRemaining(p2.name, e2, entriesByRound))) : '—'));
     if (editable && (e1 || e2)) {
       row.classList.add('editable');
       row.title = 'Tap a thrown value to edit that thrower';
@@ -1185,59 +1210,66 @@ function renderGame(router, params) {
     return remaining;
   }
 
-// Open a modal to edit one rawDarts entry and rebuild the game.
-  function openHistoryEdit(idx) {
+// Open the calc in "edit mode" for an existing history entry. The
+  // calc buffer is pre-loaded with the entry's values, the calc
+  // shows an "Editing throw N" indicator, and the next Commit
+  // overwrites that entry in `game.rawDarts` via `editRawDart`
+  // instead of appending a new throw.
+  //
+  // Cancelling is implicit — any click on a different history cell
+  // (or entering a fresh throw without committing first) drops the
+  // edit-mode state. The calc's own clear/back actions also reset
+  // the buffer but leave `editingHistoryEntry` set, so the next
+  // digits the user types start a NEW throw under the original
+  // edit-mode target — that's the simplest mental model.
+function openHistoryEdit(idx) {
     if (game.winner != null) { toast('Cannot edit after match is over'); return; }
     const entry = game.rawDarts[idx];
     if (!entry) return;
+
     const isPerDart = game.type === 'x01' && (game.opts.in !== 'single' || game.opts.out !== 'single');
-    const body = el('div', { style: 'display:flex; flex-direction:column; gap:12px;' });
-    body.appendChild(el('p', { class: 'muted' }, formatTurnLabel(entry, game)));
 
-    let newTotal = entry.total ?? 0;
-    const input = el('input', {
-      type: 'number',
-      class: 'input',
-      value: newTotal,
-      min: 0,
-      max: 180,
-      oninput: (e) => { newTotal = Math.max(0, parseInt(e.target.value || '0', 10) || 0); },
-    });
-    if (!isPerDart) {
-      body.appendChild(el('label', {}, 'Turn total'));
-      body.appendChild(input);
-    }
+    // Clear any current calc buffer so the pre-loaded values are
+    // visible immediately and don't get mixed with leftovers.
+    x01DartBuffer.length = 0;
 
-    // For per-dart x01 variants we reuse the x01 dart grid.
-    let newDarts = (entry.dartsData || []).slice();
     if (isPerDart) {
-      const grid = renderX01DartGrid(newDarts, () => {}, () => {}, () => closeModal(), () => {});
-      body.appendChild(grid.root);
+      // Pre-load the per-dart buffer from the entry's dartsData.
+      if (entry.dartsData && entry.dartsData.length) {
+        for (const d of entry.dartsData) x01DartBuffer.push({ ...d });
+      }
+      editingHistoryEntry = { idx, type: 'darts' };
+    } else if (game.type === 'x01') {
+      // Single-in/single-out x01: load the turn total into the calc.
+      // The calc UI shows whatever is currently in `x01TurnBuffer`
+      // via `legRunningTotal` — but for edit we need a real buffer.
+      // Easiest: synthesise a single-dart buffer whose total equals
+      // `entry.total`, and let the user re-enter.
+      if (entry.dartsData && entry.dartsData.length) {
+        for (const d of entry.dartsData) x01DartBuffer.push({ ...d });
+        editingHistoryEntry = { idx, type: 'darts' };
+      } else {
+        // Plain total entry — we still go through `x01DartBuffer` so
+        // the calc has something to display. Commit will treat it as
+        // a single throw of that total.
+        editingHistoryEntry = { idx, type: 'total' };
+      }
+    } else if (game.type === 'shanghai') {
+      if (entry.segments && entry.segments.length) {
+        x01DartBuffer.length = 0;
+        for (const s of entry.segments) x01DartBuffer.push(s);
+      }
+      editingHistoryEntry = { idx, type: 'segments' };
+    } else {
+      // Cricket / other — total-only edit for now.
+      editingHistoryEntry = { idx, type: 'total' };
     }
 
-    showModal({
-      title: 'Edit turn',
-      body,
-      actions: [
-        { label: 'Cancel', kind: 'ghost', onClick: closeModal },
-        { label: 'Save', kind: 'primary', onClick: () => {
-          let newEntry;
-          if (isPerDart) {
-            const total = newDarts.reduce((s, d) => s + dartValue(d), 0);
-            newEntry = { ...entry, dartsData: newDarts, total, darts: newDarts.length };
-          } else {
-            newEntry = { ...entry, total: newTotal };
-          }
-          const updated = editRawDart(game, idx, newEntry);
-          if (!updated) { toast('Invalid turn (would bust or break game rules)'); return; }
-          game = updated;
-          closeModal();
-          afterThrow(false);
-          toast('Turn updated');
-        } },
-      ],
-    });
-  }
+    // Re-render so the calc picks up the pre-loaded buffer and
+    // shows the edit-mode banner.
+    render();
+    toast(`Editing ${formatTurnLabel(entry, game)} — type a new value, then Commit`);
+}
 
   function formatTurnLabel(entry, game) {
     const p = (game.players || []).find(pl => pl.name === entry.by);
@@ -1357,16 +1389,44 @@ function renderGame(router, params) {
     if (game.matchMode) meta.appendChild(el('div', {}, 'Match', el('strong', {}, 'Best of ' + (game.legsToWin * 2 - 1))));
 
     // Rebuild the shared history strip in place. It lives at screen
-    // level (between toolbar and scoreboard); we swap the element with
-    // a fresh render so new rounds show up after each throw.
-    // For Cricket, swap with the cricket scorecard re-render instead.
-    if (sharedHistory && sharedHistory.parentNode) {
-      const fresh = game.type === 'cricket'
-        ? renderCricketScorecard()
-        : renderSharedHistory();
-      sharedHistory.replaceWith(fresh);
-      sharedHistory = fresh;
-    }
+        // level (between toolbar and scoreboard); we swap the element with
+        // a fresh render so new rounds show up after each throw.
+        // For Cricket, swap with the cricket scorecard re-render instead.
+        //
+        // Scroll behaviour:
+        // - If the user is parked at the bottom (or near it) of the strip,
+        //   keep them pinned at the bottom so new rounds auto-scroll in.
+        // - If they scrolled UP to read older rounds, preserve their
+        //   scroll position so the next throw doesn't yank them back down.
+        // - On a fresh render with no prior scrollTop (first render),
+        //   land at the bottom too.
+        if (sharedHistory && sharedHistory.parentNode) {
+          const oldList = sharedHistory.querySelector('.shared-history-list');
+          const wasPinnedToBottom = !oldList
+            || oldList.scrollHeight - oldList.scrollTop - oldList.clientHeight < 20;
+          const preservedScrollTop = oldList ? oldList.scrollTop : 0;
+
+          const fresh = game.type === 'cricket'
+            ? renderCricketScorecard()
+            : renderSharedHistory();
+          sharedHistory.replaceWith(fresh);
+          sharedHistory = fresh;
+
+          // Restore scroll on the freshly rendered list. If the user was
+          // pinned at the bottom (or this is the first render), jump to the
+          // new bottom so the latest round stays visible.
+          const newList = fresh.querySelector('.shared-history-list');
+          if (newList) {
+            if (wasPinnedToBottom) {
+              newList.scrollTop = newList.scrollHeight;
+            } else {
+              // Clamp to the new scrollHeight (the list might be shorter
+              // on a fresh render, e.g. after a leg reset).
+              newList.scrollTop = Math.min(preservedScrollTop,
+                                           newList.scrollHeight - newList.clientHeight);
+            }
+          }
+        }
 
     board.innerHTML = '';
     // Layout: two player cells side-by-side. The shared history strip
@@ -1450,14 +1510,40 @@ function renderGame(router, params) {
     // `game.current` to the next player — otherwise the entry's `by`
     // field would point at the next thrower, not the one who just threw.
     const throwerName = game.players[game.current]?.name;
+
+    // History-edit branch: overwrite the existing entry at
+    // `editingHistoryEntry.idx` instead of appending a new turn.
+    if (editingHistoryEntry) {
+        const { idx } = editingHistoryEntry;
+        const oldEntry = game.rawDarts[idx];
+        if (!oldEntry) { editingHistoryEntry = null; return; }
+        const result = (game.type === 'x01') ? submitTurnTotal01(game, total)
+          : (game.type === 'shanghai') ? submitTurnTotalShanghai(game, total)
+          : null;
+        const meta = result ? {
+          darts: result.darts,
+          isLegWin: !!result.isLegWin,
+          isCheckout: !!result.isCheckout,
+          bust: !!result.bust,
+        } : { darts: 3, isLegWin: false, isCheckout: false, bust: false };
+        const newEntry = { total, ...meta, by: oldEntry.by };
+        const updated = editRawDart(game, idx, newEntry);
+        if (!updated) { toast('Invalid turn (would bust or break game rules)'); return; }
+        game = updated;
+        editingHistoryEntry = null;
+        afterThrow(false);
+        toast('Turn updated');
+        return;
+    }
+
     const result = (game.type === 'x01') ? submitTurnTotal01(game, total)
-      : (game.type === 'shanghai') ? submitTurnTotalShanghai(game, total)
-      : null;
+        : (game.type === 'shanghai') ? submitTurnTotalShanghai(game, total)
+        : null;
     const meta = result ? {
-      darts: result.darts,
-      isLegWin: !!result.isLegWin,
-      isCheckout: !!result.isCheckout,
-      bust: !!result.bust,
+        darts: result.darts,
+        isLegWin: !!result.isLegWin,
+        isCheckout: !!result.isCheckout,
+        bust: !!result.bust,
     } : { darts: 3, isLegWin: false, isCheckout: false, bust: false };
     game.rawDarts.push({ total, ...meta, by: throwerName });
     // Tournament sync: if this game has a tournament host (set up

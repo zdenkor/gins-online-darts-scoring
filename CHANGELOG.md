@@ -5,6 +5,25 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 Versions follow [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 Source of truth for the current version: `VERSION` and `package.json`.
 
+## [0.5.4] - 2026-06-30
+
+Edit-history highlight, sticky history header, no row padding.
+
+### Edit-history highlight
+- Clicking a thrown value in the shared history strip now lights up the **editable cell** (column 1 = P1 thrown, column 4 = P2 thrown) with a green pulsing background and inset border. The remaining cells (column 2 = P1 remaining, column 3 = round dart-count, column 5 = P2 remaining) stay unchanged — only the cells that hold values the user is about to overwrite light up.
+- Green uses the existing `--accent` token (`rgb(28, 194, 139)`) so the highlight fits the app's accent colour.
+- Highlight is re-applied on every render so navigating back to the game after closing / opening a modal keeps the right cell lit.
+
+### Sticky history header
+- `.sh-header` is now `position: sticky; top: 0` inside the history strip — the column labels stay pinned at the top while the user scrolls through older rounds. Without this, the header scrolls off-screen together with the data rows and the user loses their reference for which number means what.
+- `z-index: 1` keeps the header visually above the (borderless) data rows below.
+
+### History row layout
+- `.shared-history-row` lost its `padding: 0.4vh 2%`. Cells now span the full row width and rely on their own `text-align` (left / center / right) to position content within their column. The row's vertical sizing still comes from `min-height: 4vh` so the row never collapses below ~4% of the viewport.
+
+### Auto-scroll for shared history
+- After every render, the strip either pins to the bottom (if the user was already there) or preserves the user's scroll position (if they had scrolled up to read older rounds). This way new rounds auto-scroll into view without yanking the user away from their reading position.
+
 ## [0.5.3] - 2026-06-30
 
 Calc compression, history natural order, shared-history scrolling, and auto-fullscreen.

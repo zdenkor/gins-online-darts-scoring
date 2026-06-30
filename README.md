@@ -11,18 +11,17 @@ live in their own Google Drive `appDataFolder`. Peers connect peer-to-peer
 via WebRTC.
 
 - **Live**: https://zdenkor.github.io/gins-online-darts-scoring/
-- **Latest**: v0.5.3 (calc compression, history natural order, auto-fullscreen, fluid typography)
+- **Latest**: v0.5.4 (edit-history highlight, sticky history header, no row padding)
 - **Repo**: https://github.com/zdenkor/gins-online-darts-scoring
 
 ---
 
-## What's new in v0.5.3
+## What's new in v0.5.4
 
-- **Compressed calc that scrolls to fit any frame** — every button and the entered-display share a single `4.5vh` row height, with `calc-pad` and `calc-actions` using `grid-auto-rows: 4.5vh` so the action row and numpad rows visually align.
-- **Shared history natural order** — rounds render oldest-at-top, newest-at-bottom (header pinned to the top). Single `max-height: min(45vh, 360px)` cap across all viewports; the strip scrolls internally when there are many rounds.
-- **Auto-fullscreen on game start** — `renderGame` attaches a one-shot gesture listener that calls `requestFullscreen()` on the user's first click/tap.
-- **Toolbar compressed ~10%** — `padding`, `margin`, `gap` switched to viewport-relative units; toolbar drops from ~64px to ~59px on a 620-tall viewport.
-- **Fluid typography throughout** — button `font-size` uses `%` of parent font-size (no `px` for layout); `.shared-history-row` text reads at 100% of parent, header at 70%. Documented in the new `RESPONSIVE DESIGN CONVENTIONS` block at the top of `styles/main.css`.
+- **Edit-history highlight** — clicking a thrown value in the shared history now lights up that specific cell (column 1 or 4) with a green pulsing background so the user can see exactly which number is being edited. The remaining / round cells stay unchanged.
+- **Sticky history header** — `.sh-header` is `position: sticky; top: 0` so the column labels stay pinned at the top of the strip while the user scrolls through older rounds.
+- **History rows have no padding** — cells span the full row width and rely on their own `text-align` (left / center / right) to position content within their column.
+- **Auto-scroll for shared history** — new rounds auto-scroll into view, but the strip preserves the user's scroll position if they had scrolled up to read older rounds.
 
 See `CHANGELOG.md` for the full release notes and prior versions.
 
