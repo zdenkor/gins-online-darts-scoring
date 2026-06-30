@@ -95,17 +95,93 @@ input, select, textarea { font: inherit; color: inherit; cursor: inherit; }
 }
 .app-header .sub { color: var(--muted); font-size: 12px; }
 .icon-btn {
+  /* Base style for ALL icon-buttons (toolbar's Fullscreen/Exit
+     AND header's sign-in / sign-out / settings). Provides the
+     shared ~2.75em square, border, surface-2 background, and
+     centered flex layout. The toolbar buttons (`.btn.icon-btn`)
+     override the size below to be smaller (~70% of toolbar
+     height); the header auth buttons keep the full ~44px size
+     so they're easier to tap on the homepage. The 2.75em
+     corresponds to the original 44px (16px body × 2.75 = 44px)
+     and scales with the parent's font-size for consistency
+     across viewports. */
   background: var(--surface-2); border: 1px solid var(--line);
-  color: var(--text); width: 44px; height: 44px; border-radius: 10px;
+  color: var(--text); width: 2.75em; height: 2.75em; border-radius: 0.625em;
   display: inline-flex; align-items: center; justify-content: center;
 }
 .icon-btn:hover { background: #232c3d; }
+.btn.icon-btn {
+  /* Toolbar icon-buttons override the base 44×44 to be smaller
+     (~70% of the toolbar's height). The `.btn.icon-btn` (2-class)
+     selector wins the cascade over the base `.btn` rule which
+     sets a 4.4em touch-target min-height. All sizes use vh / em
+     so they scale with the viewport and toolbar's font-size. */
+  width: 6.5vh; height: 6.5vh;
+  min-width: 1.6em; min-height: 1.6em;
+  max-width: 2.4em; max-height: 2.4em;
+  font-size: 1.3em; line-height: 1;
+  border-radius: 0.5em;
+  display: inline-flex; align-items: center; justify-content: center;
+  box-sizing: border-box;
+  padding: 0;
+}
+/* Icons (SVG and any inline glyph) inside icon-buttons are sized
+   to 80% of the button so they have a small padding around the
+   edges. Without this, the SVG would fill the entire button and
+   its corners would touch the border. The auth buttons get their
+   own size via `.icon-btn.auth-btn svg { width: 20px }` below,
+   so this rule doesn't apply to them (the more specific selector
+   wins). */
+.btn.icon-btn > svg,
+.btn.icon-btn > .icon {
+  width: 80%;
+  height: 80%;
+  display: block;
+}
+.btn.icon-btn:hover { background: #232c3d; }
+
+/* Danger icon button (e.g. the toolbar's Exit game button) — red
+   text/icon so the button reads as a destructive action even
+   though it sits on the same dark surface as the other ghost
+   buttons. The border stays neutral (no red frame) so the button
+   doesn't visually shout — just the icon is red, which is the
+   universal "danger" cue. Hover adds a subtle red background tint. */
+.btn.icon-btn.danger {
+  color: var(--danger);
+  border-color: var(--line);
+  background: transparent;
+  /* Bump the font-size so the unicode ⏻ (U+23FB) glyph renders
+     at the same visual size as the SVG icon in the Fullscreen
+     button. The fullscreen SVG fills 80% of the 41px button
+     (~31px) while the ⏻ glyph at 1.3em (19.89px) only renders
+     ~13px wide — about 64% of the SVG. 2em brings the glyph up
+     to ~30px to match the SVG.
+
+     We also override the min-width / min-height to vh so the
+     button doesn't grow with the bumped font-size (the base
+     rule's `1.6em` min would push it to 46px+). */
+  font-size: 2em;
+  min-width: 6.5vh;
+  min-height: 6.5vh;
+  max-width: 6.5vh;
+  max-height: 6.5vh;
+}
+.btn.icon-btn.danger:hover {
+  background: rgba(239, 68, 68, 0.15);
+  border-color: var(--line);
+  color: var(--danger);
+}
 
 /* Sign-in / sign-out icon buttons in the header. The SVG inherits
    `currentColor` via fill on hover. When disabled (the user is in
    the opposite auth state), the button is greyed out and
-   non-clickable. */
-.icon-btn.auth-btn svg { width: 20px; height: 20px; fill: currentColor; }
+   non-clickable. The SVG is sized to 80% of the button so the
+   icon has the same visual fill ratio as the toolbar's
+   Fullscreen/Exit SVGs (which also use 80%). Without this, the
+   1.25em / 45% sizing makes the auth icons look smaller than
+   the toolbar icons even though the buttons themselves are the
+   same 47px. */
+.icon-btn.auth-btn svg { width: 80%; height: 80%; fill: currentColor; }
 
 /* ---------- help icon styles ---------- */
 .help-icon {
@@ -436,76 +512,13 @@ main { flex: 1; padding: 16px; width: 100%; margin: 0 auto;
   box-shadow: 0 0 0 1px rgba(44,212,154,0.4) inset;
 }
 .field.button-row-field {
-  /* Single horizontal row: label on the left, button group on the
-     right, all on ONE line. Previously the label was on its own
-     line (`display: block` on the label) and the button group
-     below it, which made every option take two lines of vertical
-     space in the form. Putting them side-by-side compacts the
-     setup form to a single column of "label : value" rows. */
-  display: flex;
-  align-items: center;
-  gap: 12px;
-  flex-wrap: nowrap;
+  /* Default layout: label on its own line (`display: block` on
+     the label), button group below. This is the standard
+     vertical form layout — each option takes one row of vertical
+     space with the label above the buttons. */
 }
 .field.button-row-field label {
-  /* Inline label so it sits to the LEFT of the button group on
-     the same row. The user reads the form as "Legs to Win:
-     [button group]", "Mode: [button group]", etc. — each field
-     is one horizontal line. */
-  display: inline-block;
-  flex: 0 0 auto;
-  margin: 0;
-  font-size: 12px;
-  color: var(--muted);
-  text-transform: uppercase;
-  letter-spacing: .8px;
-  /* min-width ensures all labels in a column align vertically */
-  min-width: 14ch;
-  white-space: nowrap;
-}
-.field.button-row-field .btn-row.segmented {
-  flex: 1 1 auto;
-  flex-wrap: wrap;
-}
-
-/* Compact one-line option summary used by the game setup form.
-   Each row shows: small muted label "Legs to Win:" followed by
-   the current value as bigger white text "First to 1". This
-   compresses the form to a few lines instead of one button
-   group per option, making the whole setup fit on a single
-   screen. */
-.opts-summary {
-  display: flex;
-  flex-direction: column;
-  gap: 0.6em;
-  margin-bottom: 1.2em;
-}
-.opt-summary-row {
-  display: flex;
-  align-items: baseline;
-  gap: 0.8em;
-  padding: 0.4em 0;
-}
-.opt-summary-row .opt-label {
-  /* Same font size as the value so the row reads as a single
-     "Label: Value" line with consistent typography. The
-     color contrast (muted grey label + white value) is what
-     distinguishes them — no size mismatch. */
-  font-size: 2.4vh;
-  color: var(--muted);
-  text-transform: uppercase;
-  letter-spacing: 0.08em;
-  flex: 0 0 auto;
-  white-space: nowrap;
-}
-.opt-summary-row .opt-value {
-  font-size: 2.4vh;
-  color: var(--text);
-  font-weight: 600;
-  flex: 1 1 auto;
-  white-space: nowrap;
-  overflow: hidden;
-  text-overflow: ellipsis;
+  margin-bottom: 4px;
 }
 
 /* Generic input class — readable on dark background, white text. */
@@ -578,7 +591,7 @@ select.input option, select.dropdown-readable option {
 
 /* ---------- Game screen ---------- */
 .game-toolbar {
-  display: flex; flex-wrap: wrap; gap: 1.5%; align-items: center; justify-content: space-between;
+  display: flex; flex-wrap: nowrap; gap: 1.5%; align-items: center; justify-content: space-between;
   background: var(--surface); border: 1px solid var(--line); border-radius: var(--radius);
   padding: 0.55vh 2%; margin-bottom: 1%;
   /* 90% font-size relative to parent so the toolbar content is
@@ -587,15 +600,36 @@ select.input option, select.dropdown-readable option {
      (0.55vh ≈ 5.4px on a 620px viewport, down from 6px). */
   font-size: 90%;
 }
-.game-toolbar .meta { display: flex; gap: 10px; flex-wrap: wrap; min-width: 0; }
+.game-toolbar .meta {
+  /* Single horizontal row for all toolbar info items (Legs to Win,
+     Mode, Sets to Win, Online, etc.) — `flex-wrap: nowrap` keeps
+     everything on one line and items can shrink horizontally
+     (flex: 0 1 auto) to fit. If the toolbar is too narrow to
+     hold all items at minimum width, they'll be truncated with
+     ellipsis rather than wrapping to a second row. */
+  display: flex;
+  flex-wrap: nowrap;
+  gap: 1.2em;
+  min-width: 0;
+  flex: 1 1 auto;
+  align-items: center;
+  overflow: hidden;
+}
 .game-toolbar .meta > div:nth-child(-n+2) { display: none; } /* hide Game + Round/Turn */
-.game-toolbar .meta div { font-size: clamp(11px, 1.4vw, 13px); color: var(--muted); }
+.game-toolbar .meta div {
+  font-size: 1.6vh;
+  color: var(--muted);
+  flex: 0 1 auto;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
 .game-toolbar .meta strong {
   color: var(--text);
-  font-size: clamp(13px, 1.7vw, 16px);
-  display: block;
+  font-size: 1.9vh;
+  display: inline;
+  margin-left: 0.4em;
   overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
-  max-width: 100%;
 }
 
 /* ---------- Player scoreboard ----------
@@ -1343,10 +1377,11 @@ footer.app-footer .version {
 }
 /* Half-height action row: 3 icon-only buttons that replace the
    removed hint line. Each button is half the height of a numpad
-   row, and the three share the calc width. */
+   row, and the four (Undo, Redo, SetScore, MoreCmds) share the
+   calc width equally. */
 .calc-actions {
   display: grid;
-  grid-template-columns: 1fr 1fr 1fr;
+  grid-template-columns: 1fr 1fr 1fr 1fr;
   gap: clamp(6px, 1.5vw, 10px);
   width: 100%;
   /* Sits between the display and the numpad. The numpad's grid
@@ -1367,9 +1402,26 @@ footer.app-footer .version {
 }
 .calc-action-btn:hover { background: #2c374f; }
 .calc-action-btn:active { transform: translateY(1px); }
-.calc-action-btn.calc-action-exit    { color: var(--danger); }
+/* Calc action row icon colors. Each button gets a color that
+   matches its semantic role:
+     undo     — neutral (text color, no special emphasis)
+     redo     — neutral (text color, no special emphasis)
+     setscore — accent (green, "confirmative" action)
+     morecmds — text (no emphasis, opens a submenu)
+   The old `calc-action-exit` rule was for the calc's now-removed
+   Exit button (moved to the toolbar); Undo took its place.
+   `morecmds` is also slightly larger (1.15em font) than the
+   other three because the three-dot ellipsis is the most
+   space-efficient glyph in the row and reads smaller visually
+   than the arrow characters. Boosting its size keeps the four
+   buttons feeling equally prominent on small viewports. */
+.calc-action-btn.calc-action-undo    { color: var(--text); }
+.calc-action-btn.calc-action-redo    { color: var(--text); }
 .calc-action-btn.calc-action-setscore{ color: var(--accent); }
-.calc-action-btn.calc-action-morecmds{ color: var(--text); }
+.calc-action-btn.calc-action-morecmds{
+  color: var(--text);
+  font-size: 1.15em;
+}
 
 .calc-hint {
   color: var(--muted);
@@ -1745,7 +1797,11 @@ footer.app-footer .version {
   max-width: min(620px, 100%);
   box-shadow: 0 20px 60px rgba(0, 0, 0, 0.5);
 }
-.modal-title { margin: 0 0 8px; font-size: clamp(20px, 2.8vw, 24px); }
+/* Modal title is ~30% larger than the previous clamp(20px, 2.8vw, 24px)
+   — now 26-31px range. The h3 in "More commands" and other modals
+   was reading small on the game screen; bumping the font size
+   makes the title a clear visual anchor for the modal. */
+.modal-title { margin: 0 0 8px; font-size: clamp(26px, 3.6vw, 31px); }
 .modal-body  { margin: 0 0 14px; color: var(--text); line-height: 1.45; font-size: 15px; }
 .modal-actions { display: flex; gap: 8px; justify-content: flex-end; flex-wrap: wrap; }
 .modal-actions .btn {
@@ -1756,20 +1812,28 @@ footer.app-footer .version {
   padding: 12px 16px;
 }
 
-.cmd-list { display: grid; gap: 6px; }
+/* Cmd list (used in the "More commands" modal) — label and
+   description are both ~30% larger than the previous sizing
+   to match the modal-title's 30% bump. The icons in the label
+   (↶ ⇄ → ⓘ ⏹) are unicode glyphs in the same font-size, so
+   they scale automatically with the label text. */
+.cmd-list { display: grid; gap: 8px; }
 .cmd-row {
   display: block; width: 100%;
   background: var(--bg-2); border: 1px solid var(--line);
   border-radius: 10px;
-  /* Touch target: 48px minimum so every command is tappable. */
-  padding: 12px 14px; min-height: 56px;
+  /* Touch target: 48px minimum so every command is tappable.
+     Bumped from 56px to 64px to fit the larger 24px label
+     font + 18px description font. All sizes in em so they
+     scale with the parent font-size. */
+  padding: 0.875em 1em; min-height: 4em;
   text-align: left;
   color: var(--text);
   transition: background .12s ease, border-color .12s ease;
 }
 .cmd-row:hover { background: var(--surface-2); border-color: var(--accent); }
-.cmd-row .cmd-label { font-size: clamp(16px, 2.2vw, 18px); font-weight: 600; }
-.cmd-row .cmd-desc  { font-size: clamp(12px, 1.6vw, 14px); color: var(--muted); margin-top: 2px; }
+.cmd-row .cmd-label { font-size: clamp(21px, 2.9vw, 24px); font-weight: 600; }
+.cmd-row .cmd-desc  { font-size: clamp(15px, 2.1vw, 18px); color: var(--muted); margin-top: 4px; }
 
 .stats-panel { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
 .stats-card  {

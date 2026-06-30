@@ -5,6 +5,71 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 Versions follow [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 Source of truth for the current version: `VERSION` and `package.json`.
 
+## [0.5.6] - 2026-06-30
+
+### Added
+- **Auto-fullscreen on game start** — clicking "Start game" on the
+  setup screen auto-enters fullscreen via `requestFullscreen()` in a
+  microtask (user-gesture preserved; browser blocks are silently
+  caught so the user can still click the toolbar's fullscreen
+  button to retry).
+- **Redo action in the calculator** — added a ↷ "Redo" button
+  right of Undo in the calc action row. Pop and push are tracked
+  on a `__gindartsRedoStack` (module-level) so the user can
+  re-apply the most recently undone dart.
+- **Restructured settings page** — new "Settings" umbrella card
+  on the settings page contains two sub-sections:
+  - **Display settings** (h4) → **Cursor** (h5) with a button
+    that opens the existing quick-cursor-settings modal.
+  - **Assistance settings** (h4) → **Help icons** (h5) and
+    **Debug overlay** (h5) with On/Off segmented toggles.
+  The new Help icons toggle is a first-class setting (it
+  persists via `saveUiHelpSettings({ show })` and updates the
+  app header so the gear icon stays in sync).
+- **Per-button font-size multiplier** in the calculator's
+  `fitFontToFrame()` — MoreCmds gets a 1.15× boost so the
+  three-dot ellipsis reads with the same visual weight as
+  the arrow glyphs (↶, ↷, ＝) on small viewports.
+
+### Changed
+- **Calculator action row** went from 3 buttons (Undo, SetScore,
+  MoreCmds) to 4 (Undo, Redo, SetScore, MoreCmds); the
+  `.calc-actions` grid is now 4 equal columns.
+- **Calculator grid now uses total-entry for all in/out modes** —
+  `submitTurnTotal01` no longer returns `ignored` for DI/DO;
+  users always enter the total via numpad, never per-dart taps.
+  Test was updated to match the new contract.
+- **Exit button is unicode ⏻ (U+23FB)**, drawn as the literal
+  character (not an inline SVG). Font-size bumped to 2em so the
+  glyph renders at the same visual size as the Font Awesome
+  expand SVG (~30px).
+- **Max darts presets** changed to `21, 36, 45, 51, 99, Custom`
+  (was `20, 30, 45, 50, 100`).
+- **Toolbar info labels** shortened to `Sets: N | Legs: N |
+  Game: 501 · DI/DO` for the one-row layout.
+- **Auth buttons (sign-in, sign-out, settings)** — the `.icon-btn`
+  base rule was preserved (it had been accidentally narrowed to
+  `.btn.icon-btn` during a prior refactor, breaking the auth
+  buttons' background / border / color). All sizes are now
+  responsive (em/vh/% — no px in the icon-btn rules).
+- **Auth button SVGs** sized to 80% of the button (matching the
+  toolbar's Fullscreen/Exit SVG fill ratio) so all dashboard
+  icons have the same visual prominence.
+
+### Fixed
+- **Exit button font-size** no longer scales the button itself
+  (the base rule's `1.6em` min was pushing it to 49px); the
+  danger variant now pins `min/max-width/height: 6.5vh` to keep
+  the button at 41×41px.
+- **Auth button background / hover** restored after the base
+  `.icon-btn` rule had been narrowed to `.btn.icon-btn` (the
+  auth buttons don't carry the `.btn` class).
+- **Modal title** bumped ~30% larger (from clamp(20-24px) to
+  clamp(26-31px)) so the h3 in "More commands" and other modals
+  reads as a clear visual anchor.
+- **Cmd-row** label and description also ~30% larger; padding
+  converted to em and min-height to 4em for full responsiveness.
+
 ## [0.5.5] - 2026-06-30
 
 Compact setup form (one-line "Label: Value" summary), responsive

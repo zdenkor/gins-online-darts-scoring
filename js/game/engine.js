@@ -476,17 +476,15 @@ export function submitTurnTotal01(state, total) {
   const pts = Math.max(0, Math.floor(total) || 0);
   if (pts > 180) return { state, events: [{ type: 'ignored', reason: 'total-too-high' }], applied: 0 };
   const inOut = state.opts || {};
-  // Total-entry mode cannot validate double/triple/master finish rules,
-  // so it only supports free play (single-in + single-out) and double-out,
-  // where we trust the caller about the finish.
-  if (inOut.in !== 'single' || (inOut.out !== 'single' && inOut.out !== 'double')) {
-    return { state, events: [{ type: 'ignored', reason: 'needs-per-dart-entry' }], applied: 0 };
-  }
-  // Soft max-darts warning: count 3 darts per entered turn beyond cap.
-  const cap = state.opts.maxDarts | 0;
-  if (pts > 0 && cap > 0) {
-    events_push_warn(state, pts, cap);
-  }
+  // Total-entry mode: the user enters a single total for the turn
+  // (e.g. "60" for 3 darts of 20 each). The engine trusts the
+  // caller's total and applies it directly. The double-in / double-out
+  // validation is implicit — the caller is responsible for the
+  // validity of the score, and the engine handles the bust logic
+  // (over-scoring, or landing on 1 in DO mode). For more strict
+  // per-dart validation, the segment-tap entry mode would be needed,
+  // but the user prefers the simpler numpad entry for all in/out
+  // combinations.
   const startScore = player.score;
   const prospective = startScore - pts;
   const isFinish = prospective === 0;

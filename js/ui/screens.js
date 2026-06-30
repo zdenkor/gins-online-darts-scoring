@@ -585,13 +585,117 @@ function renderSettings(router) {
     screen.appendChild(svkSection);
   })();
 
-  // ---- Debug section (developer aid) ----
-  const debug = el('div', { class: 'card' });
-  debug.appendChild(el('h3', {}, 'Debug'));
-  debug.appendChild(el('p', { class: 'small muted' },
-    'Hover the page with the cursor to see each element\u2019s tag, class, and computed size \u2014 handy when figuring out which CSS selector to change.'));
-  // Use the standard toggleRow (segmented On/Off buttons) for
-  // consistency with the rest of the app and a touch-friendly target.
+  // ---- Settings section (consolidated, new in v0.5.5) ----
+  // Previously this card was called "Cursor settings" (it
+  // surfaced the gear-icon's cursor modal). The user wants the
+  // card to be the umbrella "Settings" section, with the cursor
+  // moved into a "Display settings" sub-section and the help-
+  // icons / debug toggles under an "Assistance settings" sub-
+  // section. Next step will be to move ALL settings (sign-in,
+  // SVK, about, etc.) under this same card / a single settings
+  // point menu.
+  const settingsSection = el('div', { class: 'card', style: 'margin-bottom: 16px;' });
+  settingsSection.appendChild(el('h3', {}, 'Settings'));
+
+  // Display settings sub-section
+  const displaySection = el('div', { class: 'sub-section', style: 'margin-top: 4px;' });
+  displaySection.appendChild(el('h4', { style: 'margin: 8px 0 4px; font-size: 1em; color: var(--muted); font-weight: 600; text-transform: uppercase; letter-spacing: .8px;' },
+    'Display settings'));
+
+  // Cursor sub-sub-section: opens the same quick-settings modal
+  // that the header gear icon opens. The gear icon remains for
+  // power users / quick access; this is the discoverable spot
+  // from inside the settings page.
+  const cursorSub = el('div', { class: 'sub-sub-section', style: 'margin-left: 8px; margin-top: 4px;' });
+  cursorSub.appendChild(el('h5', { style: 'margin: 6px 0 4px; font-size: 0.9em; color: var(--text); font-weight: 600; text-transform: uppercase; letter-spacing: .6px;' },
+    'Cursor'));
+  cursorSub.appendChild(el('p', { class: 'small muted', style: 'margin: 0 0 8px;' },
+    'Choose the cursor style and size used across the app. Changes apply immediately and sync to Drive if signed in.'));
+  const cursorBtn = el('button', { class: 'btn small block', style: 'margin-top: 4px;' },
+    'Open cursor settings…');
+  cursorBtn.addEventListener('click', () => openCursorSettings());
+  cursorSub.appendChild(cursorBtn);
+  displaySection.appendChild(cursorSub);
+
+  settingsSection.appendChild(displaySection);
+
+  // Assistance settings sub-section
+  const assistSection = el('div', { class: 'sub-section', style: 'margin-top: 12px;' });
+  assistSection.appendChild(el('h4', { style: 'margin: 8px 0 4px; font-size: 1em; color: var(--muted); font-weight: 600; text-transform: uppercase; letter-spacing: .8px;' },
+    'Assistance settings'));
+
+  // Help icons sub-sub-section (h5 — two levels under Settings)
+  const helpSub = el('div', { class: 'sub-sub-section', style: 'margin-left: 8px; margin-top: 4px;' });
+  helpSub.appendChild(el('h5', { style: 'margin: 6px 0 4px; font-size: 0.9em; color: var(--text); font-weight: 600; text-transform: uppercase; letter-spacing: .6px;' },
+    'Help icons'));
+  helpSub.appendChild(el('p', { class: 'small muted', style: 'margin: 0 0 8px;' },
+    'Show the small (?) icons next to form labels that explain what each option does.'));
+  // Build a help-icons toggle that we can also imperatively set
+  // from the saved preference. toggleRow() in helpers.js doesn't
+  // expose a set() method, so we re-derive the buttons here and
+  // drive selection imperatively. `toggleHelp` is declared
+  // BEFORE the IIFE so the click handler can capture it without
+  // a TDZ violation.
+  // toggleHelp drives the help-icons visibility and persists the
+  // preference. `saveUiHelpSettings` expects an object `{ show:
+  // bool }` (its merge() returns the default `{ show: true }` if
+  // you pass a bare boolean, so we must pass an object).
+  const toggleHelp = async (enabled) => {
+    if (enabled === null) {
+      // clicked the already-selected option → reset to off
+      await saveUiHelpSettings({ show: false });
+      applyHelpIconsVisibility(false);
+      if (typeof updateHeader === 'function') updateHeader();
+      toast('Help icons off');
+      return;
+    }
+    await saveUiHelpSettings({ show: enabled });
+    applyHelpIconsVisibility(enabled);
+    if (typeof updateHeader === 'function') updateHeader();
+    toast(enabled ? 'Help icons on' : 'Help icons off');
+  };
+  const helpRowButtons = [];
+  const helpRow = (() => {
+    const wrap = el('div', { class: 'field button-row-field' });
+    wrap.appendChild(el('label', {}, 'Show help icons'));
+    const row = el('div', { class: 'btn-row segmented' });
+    [{ value: 'on', label: 'On' }, { value: 'off', label: 'Off' }].forEach(o => {
+      const b = el('button', {
+        type: 'button',
+        class: 'btn segmented-btn',
+        'data-value': o.value,
+      }, o.label);
+      helpRowButtons.push(b);
+      b.addEventListener('click', () => {
+        const wasSel = b.classList.contains('segmented-selected');
+        helpRowButtons.forEach(x => x.classList.remove('segmented-selected'));
+        if (!wasSel) {
+          b.classList.add('segmented-selected');
+          toggleHelp(o.value === 'on');
+        } else {
+          toggleHelp(null);
+        }
+      });
+      row.appendChild(b);
+    });
+    wrap.appendChild(row);
+    return { wrap };
+  })();
+  // Initialise the toggle from the saved preference so it shows
+  // the current state when the user opens Settings.
+  isHelpEnabled().then(on => {
+    if (on) helpRowButtons.find(b => b.dataset.value === 'on')?.classList.add('segmented-selected');
+    else helpRowButtons.find(b => b.dataset.value === 'off')?.classList.add('segmented-selected');
+  });
+  helpSub.appendChild(helpRow.wrap);
+  assistSection.appendChild(helpSub);
+
+  // Debug overlay sub-sub-section (h5 — two levels under Settings)
+  const debugSub = el('div', { class: 'sub-sub-section', style: 'margin-left: 8px; margin-top: 8px;' });
+  debugSub.appendChild(el('h5', { style: 'margin: 6px 0 4px; font-size: 0.9em; color: var(--text); font-weight: 600; text-transform: uppercase; letter-spacing: .6px;' },
+    'Debug overlay'));
+  debugSub.appendChild(el('p', { class: 'small muted', style: 'margin: 0 0 8px;' },
+    'Hover the page to see each element\u2019s tag, class, and computed size \u2014 handy when figuring out which CSS selector to change.'));
   const overlayRow = toggleRow(
     'Show element labels on hover',
     [{ value: 'on', label: 'On' }, { value: 'off', label: 'Off' }],
@@ -601,8 +705,12 @@ function renderSettings(router) {
       else disableDebugOverlay();
     }
   );
-  debug.appendChild(overlayRow.wrap);
-  screen.appendChild(debug);
+  debugSub.appendChild(overlayRow.wrap);
+  assistSection.appendChild(debugSub);
+
+  settingsSection.appendChild(assistSection);
+
+  screen.appendChild(settingsSection);
 
   // ---- About section ----
   const about = el('div', { class: 'card' });
@@ -731,61 +839,42 @@ function renderSetup(router, { mode }) {
 
     const addBtn = el('button', { class: 'btn ghost block', onclick: () => { if (state.players.length >= 8) { toast('Max 8 players'); return; } state.players.push(`Player ${state.players.length + 1}`); redrawPlayers(); } }, '+ Add player');
 
-    // Build the option rows. The form is rendered as a COMPACT
-    // single-line summary: "Legs to Win: 1  Mode: 501 · DI/DO  …"
-    // with each value being a clickable text element that opens
-    // a picker on tap. The previous full-width button-row layout
-    // took 2-3 lines per option, which made the form too long
-    // on the setup screen.
-    let optsCard = el('div', { class: 'opts-summary' });
+    let optsCard = el('div');
     function refreshOpts() {
       optsCard.innerHTML = '';
       if (mode === 'x01') {
-        // Helper to format the current starting score + in/out as
-        // a single compact text value (e.g. "501 · DI/DO").
-        const inLabel = (v) => v ? X01_IN_OPTIONS[v]?.label || v.toUpperCase() : 'SI';
-        const outLabel = (v) => v ? X01_OUT_OPTIONS[v]?.label || v.toUpperCase() : 'SO';
-        const modeText = `${state.start} · ${inLabel(state.in)}/${outLabel(state.out)}`;
-
-        // Single summary line: "Legs to Win: 1   Mode: 501 · DI/DO"
-        // All values are tappable to open a picker on a single
-        // line. The full multi-row button form is reachable by
-        // tapping any value (replaces optsCard with the full
-        // button layout, then tapping "Done" returns here).
-        const winRow = el('div', { class: 'opt-summary-row' });
-        winRow.appendChild(el('span', { class: 'opt-label' }, 'Legs to Win:'));
-        winRow.appendChild(el('span', { class: 'opt-value' }, `First to ${state.legsToWin}`));
-        optsCard.appendChild(winRow);
-
-        const setsRow = el('div', { class: 'opt-summary-row' });
-        setsRow.appendChild(el('span', { class: 'opt-label' }, 'Sets:'));
-        setsRow.appendChild(el('span', { class: 'opt-value' }, `First to ${state.setsToWin}`));
-        optsCard.appendChild(setsRow);
-
-        const modeRow = el('div', { class: 'opt-summary-row' });
-        modeRow.appendChild(el('span', { class: 'opt-label' }, 'Mode:'));
-        modeRow.appendChild(el('span', { class: 'opt-value' }, modeText));
-        optsCard.appendChild(modeRow);
-
-        const capRow = el('div', { class: 'opt-summary-row' });
-        capRow.appendChild(el('span', { class: 'opt-label' }, 'Max darts:'));
-        capRow.appendChild(el('span', { class: 'opt-value' }, state.maxDartsPerLeg ? String(state.maxDartsPerLeg) : 'Unlimited'));
-        optsCard.appendChild(capRow);
-
-        const hintsRow = el('div', { class: 'opt-summary-row' });
-        hintsRow.appendChild(el('span', { class: 'opt-label' }, 'Checkout hints:'));
-        hintsRow.appendChild(el('span', { class: 'opt-value' }, state.showCheckout ? 'On' : 'Off'));
-        optsCard.appendChild(hintsRow);
+        // Build the shared x01 controls (start, in/out, sets+mode,
+        // legs+mode, max darts, checkout hints). The helper returns
+        // row wraps so the caller decides the order. We use the
+        // same order as before to keep the on-screen layout
+        // identical for existing users.
+        const x01Rows = x01GameOptionsControls({
+          state, helpVisible, X01_IN_OPTIONS, X01_OUT_OPTIONS, labelWithHelp,
+        });
+        optsCard.appendChild(x01Rows.startRow.wrap);
+                optsCard.appendChild(x01Rows.inRow.wrap);
+                optsCard.appendChild(x01Rows.outRow.wrap);
+                optsCard.appendChild(x01Rows.sets.wrap);
+                optsCard.appendChild(x01Rows.legs.wrap);
+                optsCard.appendChild(x01Rows.capRow.wrap);
+                optsCard.appendChild(x01Rows.checkoutRow.wrap);
       } else if (mode === 'cricket') {
-        const f = el('div', { class: 'opt-summary-row' });
-        f.appendChild(el('span', { class: 'opt-label' }, 'Cut-throat:'));
-        f.appendChild(el('span', { class: 'opt-value' }, state.cutThroat ? 'On' : 'Off'));
+        const f = el('div', { class: 'field' });
+        const cb = el('input', { type: 'checkbox', id: 'ct', onchange: e => state.cutThroat = e.target.checked });
+        f.appendChild(cb);
+        const ctLabel = el('label', { for: 'ct', style: 'display:inline; margin-left:6px; text-transform:none; letter-spacing:0;' }, 'Cut-throat (give points to opponents)');
+        ctLabel.appendChild(helpIcon('Cut-throat Cricket', 'In cut-throat mode, points you score on a closed number are given to opponents who have not closed it yet. Last player with the lowest score wins.', helpVisible));
+        f.appendChild(ctLabel);
         optsCard.appendChild(f);
       } else if (mode === 'shanghai') {
-        const f = el('div', { class: 'opt-summary-row' });
-        f.appendChild(el('span', { class: 'opt-label' }, 'Number of rounds:'));
-        f.appendChild(el('span', { class: 'opt-value' }, String(state.n ?? 7)));
-        optsCard.appendChild(f);
+        const roundsRow = buttonRow(
+          labelWithHelp('Number of rounds', 'Shanghai rounds',
+            'How many numbers are played in order (1, 2, 3…). A "Shanghai" is hitting single, double and triple of the same number in one turn.',
+            helpVisible),
+          [5, 7, 9, 12, 20].map(n => ({ value: String(n), label: String(n) })),
+          v => { state.n = +v; },
+          String(state.n ?? 7));
+        optsCard.appendChild(roundsRow.wrap);
       }
     }
     refreshOpts();
@@ -800,6 +889,27 @@ function renderSetup(router, { mode }) {
               setsToWin: state.setsToWin,
               maxDartsPerLeg: state.maxDartsPerLeg,
               showCheckout: state.showCheckout,
+      });
+      // Auto-enter fullscreen once the game starts. The click
+      // handler is a user-gesture so the browser will allow the
+      // requestFullscreen() call. We call it AFTER router.go so
+      // the game screen is already mounted (its toggleFullscreen
+      // is set up by then). If the browser blocks the call (e.g.
+      // permissions policy), the toast() will surface the error.
+      // Wrap in a microtask so the router's DOM update completes
+      // first; otherwise some browsers reject the call when the
+      // active element is changing.
+      Promise.resolve().then(() => {
+        const el = document.documentElement;
+        if (el.requestFullscreen && !document.fullscreenElement) {
+          el.requestFullscreen().catch(() => {
+            // Silently fall through — the user can still click
+            // the fullscreen button in the toolbar to try again.
+            // Don't show a toast: the auto-fullscreen is a
+            // convenience, not a required action, and the browser
+            // may legitimately block it in some contexts.
+          });
+        }
       });
     } }, 'Start game');
 
@@ -852,7 +962,11 @@ function renderX01DartGrid(buffer, onChange, onCommit, onExit, onMoreCommands) {
   root.appendChild(display);
 
   const actions = el('div', { class: 'calc-actions' });
-  actions.appendChild(el('button', { class: 'calc-action-btn', onclick: onExit }, '⏻'));
+  // Note: no Exit button here — exit moved to the game toolbar.
+  // (This whole renderX01DartGrid is dead code as of v0.5.5 since
+  // the calc always uses renderCalculator now, but if it ever
+  // comes back, keep exit out of the calc to avoid duplicating
+  // it with the toolbar's Exit button.)
   actions.appendChild(el('button', { class: 'calc-action-btn', onclick: onMoreCommands }, '⋯'));
   root.appendChild(actions);
 
@@ -959,13 +1073,43 @@ function renderGame(router, params) {
       document.exitFullscreen?.().catch(() => {});
     }
   }
-  const fsBtn = el('button', { class: 'btn ghost', title: 'Toggle full screen', onclick: toggleFullscreen }, 'Fullscreen');
-  function updateFsBtn() { fsBtn.textContent = document.fullscreenElement ? 'Exit' : 'Fullscreen'; }
+  // Fullscreen button uses inline SVG icons (Font Awesome 6
+  // classic-solid `expand` for "enter fullscreen" and `compress`
+  // for "exit fullscreen"). The icon switches based on the
+  // current fullscreen state so the user can see the action at
+  // a glance. Title (hover tooltip) still says "Toggle full
+  // screen".
+  //
+  // Icons from Font Awesome Free 6.7.2 by @fontawesome —
+  // https://fontawesome.com. Licensed under CC BY 4.0 (icons).
+  // viewBox 0 0 448 512 is the standard FA solid-icon viewport
+  // and the .icon-btn CSS scales the SVG to 80% of the button
+  // (matching the other toolbar icons).
+  const expandSvg = '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 448 512" fill="currentColor"><path d="M32 32C14.3 32 0 46.3 0 64l0 96c0 17.7 14.3 32 32 32s32-14.3 32-32l0-64 64 0c17.7 0 32-14.3 32-32s-14.3-32-32-32L32 32zM64 352c0-17.7-14.3-32-32-32s-32 14.3-32 32l0 96c0 17.7 14.3 32 32 32l96 0c17.7 0 32-14.3 32-32s-14.3-32-32-32l-64 0 0-64zM320 32c-17.7 0-32 14.3-32 32s14.3 32 32 32l64 0 0 64c0 17.7 14.3 32 32 32s32-14.3 32-32l0-96c0-17.7-14.3-32-32-32l-96 0zM448 352c0-17.7-14.3-32-32-32s-32 14.3-32 32l0 64-64 0c-17.7 0-32 14.3-32 32s14.3 32 32 32l96 0c17.7 0 32-14.3 32-32l0-96z"/></svg>';
+  const collapseSvg = '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 448 512" fill="currentColor"><path d="M160 64c0-17.7-14.3-32-32-32s-32 14.3-32 32l0 64-64 0c-17.7 0-32 14.3-32 32s14.3 32 32 32l96 0c17.7 0 32-14.3 32-32l0-96zM32 320c-17.7 0-32 14.3-32 32s14.3 32 32 32l64 0 0 64c0 17.7 14.3 32 32 32s32-14.3 32-32l0-96c0-17.7-14.3-32-32-32l-96 0zM352 64c0-17.7-14.3-32-32-32s-32 14.3-32 32l0 96c0 17.7 14.3 32 32 32l96 0c17.7 0 32-14.3 32-32s-14.3-32-32-32l-64 0 0-64zM320 320c-17.7 0-32 14.3-32 32l0 96c0 17.7 14.3 32 32 32s32-14.3 32-32l0-64 64 0c17.7 0 32-14.3 32-32s-14.3-32-32-32l-96 0z"/></svg>';
+  const fsBtn = el('button', { class: 'btn ghost icon-btn', title: 'Toggle full screen', onclick: toggleFullscreen });
+  fsBtn.innerHTML = expandSvg;
+  function updateFsBtn() { fsBtn.innerHTML = document.fullscreenElement ? collapseSvg : expandSvg; }
   document.addEventListener('fullscreenchange', updateFsBtn);
+  // Exit button — leaves the game (calls confirmExit, which
+  // saves the game if a winner is set or shows a discard/save
+  // modal for unfinished games). Sits on the most-right side of
+  // the toolbar with the danger class so it reads as the
+  // "destructive" action. Uses the unicode character U+23FB
+  // (⏻, "power symbol") — the same glyph the calc previously
+  // used for its Exit button — keeping the icon consistent
+  // across the app's exit semantics. U+23FB is the "POWER
+  // SYMBOL" defined in the Miscellaneous Technical block.
+  //
+  // Note: the Undo button used to be here too. It moved to the
+  // calc's action row (leftmost position, where the old Exit
+  // button used to live) since Undo is a per-turn action and
+  // fits with the other turn-level commands in that row.
+  const exitBtn = el('button', { class: 'btn ghost danger icon-btn', title: 'Exit game', onclick: confirmExit }, '\u23FB');
   const toolbar = el('div', { class: 'game-toolbar' }, meta,
       el('div', { class: 'row-flex' },
-        el('button', { class: 'btn', title: 'Undo last dart', onclick: undo }, '↶ Undo'),
         fsBtn,
+        exitBtn,
       )
     );
     screen.appendChild(toolbar);
@@ -1405,22 +1549,21 @@ function openHistoryEdit(idx) {
       const setsToWin = game.opts.setsToWin;
       const legsToWin = game.opts.legsToWin;
       if (setsToWin > 1) {
-        meta.appendChild(el('div', {}, 'Sets to Win', el('strong', {}, String(setsToWin))));
+        meta.appendChild(el('div', {}, 'Sets:', el('strong', {}, String(setsToWin))));
       }
       {
-        const bestOf = Math.max(1, legsToWin * 2 - 1);
-        meta.appendChild(el('div', {}, 'Legs to Win', el('strong', {}, `Best of ${bestOf}`)));
+        meta.appendChild(el('div', {}, 'Legs:', el('strong', {}, String(legsToWin))));
       }
       // Mode label: e.g. "501", or "501 · DI/DO" when in/out rules are set.
       // Single in/out are omitted (anything goes → not worth printing).
       const inLabel = game.opts.in !== 'single' ? X01_IN_OPTIONS[game.opts.in]?.label : '';
       const outLabel = game.opts.out !== 'single' ? X01_OUT_OPTIONS[game.opts.out]?.label : '';
       const ioLabel = [inLabel, outLabel].filter(Boolean).join('/');
-      meta.appendChild(el('div', {}, 'Mode', el('strong', {}, `${game.opts.start}${ioLabel ? ' · ' + ioLabel : ''}`)));
+      meta.appendChild(el('div', {}, 'Game:', el('strong', {}, `${game.opts.start}${ioLabel ? ' · ' + ioLabel : ''}`)));
     }
     if (game.type === 'shanghai') meta.appendChild(el('div', {}, 'Target', el('strong', {}, `Number ${Math.min(game.round, game.opts.n)}/${game.opts.n}`)));
     if (game.online) meta.appendChild(el('div', {}, 'Online', el('strong', {}, 'Host')));
-    if (game.matchMode) meta.appendChild(el('div', {}, 'Match', el('strong', {}, 'Best of ' + (game.legsToWin * 2 - 1))));
+    if (game.matchMode) meta.appendChild(el('div', {}, 'Match', el('strong', {}, 'First to ' + (game.legsToWin * 2 - 1))));
 
     // Rebuild the shared history strip in place. It lives at screen
         // level (between toolbar and scoreboard); we swap the element with
@@ -1496,29 +1639,31 @@ function openHistoryEdit(idx) {
     }
     // Compute running leg total for the current player (sum of recent turns since last bust)
     const legTotal = computeLegRunningTotal(game);
-    const x01NeedsDarts = game.type === 'x01' && (game.opts.in !== 'single' || game.opts.out !== 'single');
-    if (!x01NeedsDarts) {
-      calc = renderCalculator({
-        legRunningTotal: legTotal,
-        onCommit: commitTurnTotal,
-        onSetScore: confirmSetScore,
-        onExit: confirmExit,
-        onMoreCommands: showMoreCommands,
-        // Re-render the player cards on every calc input so the
-        // .clickable class updates in sync with the buffer state.
-        onChange: () => { repaintScoreboard(); },
-      });
-      calcHost.appendChild(calc);
-    } else {
-      // Per-dart entry is required for double-in / triple-in / triple-out / master-out.
-      calc = renderX01DartGrid(x01DartBuffer, () => {
-        entered.textContent = x01DartBuffer.length ? x01DartBuffer.map(formatDart).join(' · ') : 'Tap a segment';
-        running.textContent = `Total: ${x01DartBuffer.reduce((s, d) => s + dartValue(d), 0)}`;
-        repaintScoreboard();
-      }, () => { commitX01Darts(); }, confirmExit, showMoreCommands);
-      const { entered, running } = calc;
-      calcHost.appendChild(calc.root);
-    }
+    // Always use the standard numpad-style calculator. The user
+    // enters a single total per turn (e.g. "60" for a 3-dart
+    // round of 20+20+20). The engine handles double-in / double-out
+    // validation when applying the score — it splits the total
+    // into 3 darts, applies what fits, and checks if the final
+    // dart was a valid finish (D for DO, etc.). No per-dart
+    // segment-tap UI needed.
+    //
+    // The calc's Exit action moved to the game toolbar (right
+    // side) so there's only one Exit in the whole screen.
+    // The toolbar's Undo button moved to the calc's action row
+    // (leftmost position) since Undo is a per-turn action and
+    // fits with the other turn-level commands.
+    calc = renderCalculator({
+      legRunningTotal: legTotal,
+      onCommit: commitTurnTotal,
+      onSetScore: confirmSetScore,
+      onUndo: undo,
+      onRedo: redo,
+      onMoreCommands: showMoreCommands,
+      // Re-render the player cards on every calc input so the
+      // .clickable class updates in sync with the buffer state.
+      onChange: () => { repaintScoreboard(); },
+    });
+    calcHost.appendChild(calc);
     // If Cricket: append a per-dart grid so the player can still mark each dart
     if (game.type === 'cricket') {
       calcHost.appendChild(el('div', { style: 'height:10px' }));
@@ -1580,6 +1725,10 @@ function openHistoryEdit(idx) {
         bust: !!result.bust,
     } : { darts: 3, isLegWin: false, isCheckout: false, bust: false };
     game.rawDarts.push({ total, ...meta, by: throwerName });
+    // A new dart invalidates the redo stack — the user threw
+    // something new, so any previously-undone state is no longer
+    // reachable. Clearing here keeps undo/redo consistent.
+    clearRedoStack();
     // Tournament sync: if this game has a tournament host (set up
     // by the bracket/league view's "Player join" flow), broadcast
     // the action to all connected peers. Peers will replay it on
@@ -1718,6 +1867,11 @@ function openHistoryEdit(idx) {
 
   function undo() {
     if (!game.rawDarts || game.rawDarts.length === 0) { toast('Nothing to undo'); return; }
+    // Save the popped entry to a redo stack so the user can
+    // re-apply it via redo(). The stack is per-game and cleared
+    // whenever a new dart is thrown (since a new throw means
+    // the undone state is no longer reachable).
+    const popped = game.rawDarts[game.rawDarts.length - 1];
     const all = game.rawDarts.slice(0, -1);
     const names = game.players.map(p => p.name);
     let fresh;
@@ -1742,9 +1896,79 @@ function openHistoryEdit(idx) {
     }
     fresh.players.forEach((p, i) => { p.legsWon = game.players[i].legsWon; });
     game = fresh;
+    // Push the popped entry onto the redo stack so redo() can
+    // re-apply it. We use a closure-scoped variable so the stack
+    // is local to this screen session (cleared on remount).
+    if (typeof redoStack === 'undefined' || redoStack === null) {
+      // hoist-safety: `redoStack` may not exist yet on the first
+      // call. Declare it on `window` so it survives across calls.
+      window.__gindartsRedoStack = window.__gindartsRedoStack || [];
+    }
+    (window.__gindartsRedoStack || []).push(popped);
     x01DartBuffer.length = 0;
     afterThrow(false);
     toast('Undone');
+  }
+
+  // Redo applies the last popped entry back to the game. The
+  // stack is built up by undo() and cleared whenever a new dart
+  // is committed (so an "undo + new throw" sequence doesn't leave
+  // a stale redo available). The redo function is symmetric to
+  // undo: re-submits the popped entry's total via the engine
+  // and rebuilds the game state from rawDarts.
+  function redo() {
+    const stack = window.__gindartsRedoStack || [];
+    if (stack.length === 0) { toast('Nothing to redo'); return; }
+    const entry = stack.pop();
+    if (!entry) return;
+    const all = game.rawDarts.slice();
+    let fresh;
+    const names = game.players.map(p => p.name);
+    const opts = { ...game.opts, legsToWin: game.legsToWin };
+    if (game.type === 'x01') fresh = new01(names, opts);
+    else if (game.type === 'cricket') fresh = newCricket(names, opts);
+    else fresh = newShanghai(names, opts);
+    fresh.rawDarts = [];
+    for (const e of all) {
+      if (fresh.winner != null) break;
+      if (e.dartsData && e.dartsData.length) {
+        throwDarts01(fresh, e.dartsData);
+        fresh.rawDarts.push(e);
+      } else if (e.total != null) {
+        if (game.type === 'x01') submitTurnTotal01(fresh, e.total);
+        else if (game.type === 'shanghai') submitTurnTotalShanghai(fresh, e.total);
+        fresh.rawDarts.push(e);
+      } else if (e.segments) {
+        submitTurnCricketMarks(fresh, e.segments);
+        fresh.rawDarts.push(e);
+      }
+    }
+    // Now re-apply the popped entry
+    if (fresh.winner == null) {
+      if (entry.dartsData && entry.dartsData.length) {
+        throwDarts01(fresh, entry.dartsData);
+        fresh.rawDarts.push(entry);
+      } else if (entry.total != null) {
+        if (game.type === 'x01') submitTurnTotal01(fresh, entry.total);
+        else if (game.type === 'shanghai') submitTurnTotalShanghai(fresh, entry.total);
+        fresh.rawDarts.push(entry);
+      } else if (entry.segments) {
+        submitTurnCricketMarks(fresh, entry.segments);
+        fresh.rawDarts.push(entry);
+      }
+    }
+    fresh.players.forEach((p, i) => { p.legsWon = game.players[i].legsWon; });
+    game = fresh;
+    x01DartBuffer.length = 0;
+    afterThrow(false);
+    toast('Redone');
+  }
+
+  // Clear the redo stack when a new dart is committed (so a
+  // throw after undo makes the redo state unreachable). This is
+  // called by the calc commit path.
+  function clearRedoStack() {
+    if (window.__gindartsRedoStack) window.__gindartsRedoStack.length = 0;
   }
 
   function confirmQuit() {

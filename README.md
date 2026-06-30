@@ -11,10 +11,28 @@ live in their own Google Drive `appDataFolder`. Peers connect peer-to-peer
 via WebRTC.
 
 - **Live**: https://zdenkor.github.io/gins-online-darts-scoring/
-- **Latest**: v0.5.5 (compact one-line setup form, column-aligned strip header, removed Best-of mode toggles)
+- **Latest**: v0.5.6 (auto-fullscreen on game start, redo action, restructured settings, icon-btn 80% sizing)
 - **Repo**: https://github.com/zdenkor/gins-online-darts-scoring
 
 ---
+
+## What's new in v0.5.6
+
+- **Auto-fullscreen on game start** — clicking "Start game" on the setup screen now auto-enters fullscreen via `requestFullscreen()` in a microtask. The user-gesture is preserved (the click counts), and the router's DOM update runs first so the toolbar's Fullscreen icon stays in sync. Browser blocks are silently caught — the user can still click the toolbar's Fullscreen button to retry.
+- **Redo (↷) action in the calculator** — a 4th action button right of Undo (↶). The most recently undone dart is pushed to a `__gindartsRedoStack` and can be re-applied with one tap. A new dart commit clears the redo stack (you can't redo something past the current state).
+- **Restructured settings page** — the settings page now has a single "Settings" umbrella card with two sub-sections:
+  - **Display settings** → **Cursor** (button that opens the existing quick-cursor-settings modal).
+  - **Assistance settings** → **Help icons** (On/Off, persists to Drive) and **Debug overlay** (On/Off, dev aid).
+  The Help icons toggle is a first-class setting now — the gear icon in the header updates immediately when toggled. Next step will be to fold ALL settings (sign-in, SVK, about) under the same umbrella card.
+- **80% icon fill for toolbar and dashboard buttons** — both the toolbar's Fullscreen/Exit SVGs and the auth (sign-in, sign-out, settings) SVGs now fill 80% of the button. All three dashboard buttons render at the same dimensions with the same visual prominence.
+- **Exit button uses unicode ⏻ (U+23FB) at 2em** — not an inline SVG. The font-size bump brings the glyph to ~30px to match the Font Awesome `expand` SVG; the danger variant pins `min/max-width/height: 6.5vh` so the button stays at 41×41px despite the larger font.
+- **Calculator total-entry for all in/out modes** — `submitTurnTotal01` no longer rejects totals for DI/DO; users always enter via the numpad, never per-dart segment taps. The test was updated to match.
+- **Modal title ~30% larger** — `clamp(20-24px)` → `clamp(26-31px)`. The h3 in "More commands" and other modals is now a clear visual anchor.
+- **Cmd-row label/description ~30% larger** — `clamp(16-18px)` → `clamp(21-24px)` for labels, `clamp(12-14px)` → `clamp(15-18px)` for descriptions. All padding/min-height converted to em for full responsiveness.
+- **MoreCmds gets a 1.15× font-size boost** in `fitFontToFrame()` so the three-dot ellipsis reads with the same visual weight as the arrow glyphs (↶, ↷, ＝) on small viewports.
+- **Max darts presets** changed to `21, 36, 45, 51, 99, Custom` (was `20, 30, 45, 50, 100`).
+- **Toolbar info labels** shortened to `Sets: N | Legs: N | Game: 501 · DI/DO` (was `Sets to Win: First to N | Legs to Win: First to N | Mode: 501`).
+- **Auth buttons fully responsive** — the `.icon-btn` base rule was preserved (it had been narrowed to `.btn.icon-btn` during a prior refactor, breaking the auth buttons' background/border/color). All sizes now use em/vh/% — no px in the icon-btn rules.
 
 ## What's new in v0.5.5
 

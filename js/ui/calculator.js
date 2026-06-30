@@ -48,20 +48,32 @@ const FAST_SPLIT_INDEX = 4;
 
 // =================================================================
 // Icon-only button labels for the half-height action row.
-// Exit        → ⏻ (power symbol, "leave the game")
-// SetScore    → ＝ (equals, "set score to entered value")
-// MoreCmds    → ⋯ (horizontal ellipsis, "more commands")
+// Undo      → ↶ (leftwards arrow, "undo last dart")
+// Redo      → ↷ (rightwards arrow, "redo last undone dart")
+// SetScore  → ＝ (equals, "set score to entered value")
+// MoreCmds  → ⋯ (horizontal ellipsis, "more commands")
+//
+// The Exit button (⏻) used to live in this row but was moved to
+// the game toolbar (most-right side). The Undo button used to
+// live in the toolbar but was moved back here — Undo is a
+// per-turn action (like SetScore and MoreCmds) so it fits with
+// the other turn-level commands in this row. Keeping Undo here
+// also frees up toolbar space for the more screen-level
+// controls (Fullscreen, Exit). The Redo button sits right of
+// Undo as the symmetric counterpart.
 // =================================================================
 const ACTION_ICONS = {
-  Exit:     '⏻',
-  SetScore: '＝',
-  MoreCmds: '⋯',
+  Undo:     '\u21B6',
+  Redo:     '\u21B7',
+  SetScore: '\uff1d',
+  MoreCmds: '\u22ef',
 };
 
 export function renderCalculator({
   onCommit,
   onSetScore,        // (enteredValue) — open confirmation; parent handles the override
-  onExit,            // () — parent opens the save / discard / resume dialog
+  onUndo,            // () — parent undoes the last dart/turn
+  onRedo,            // () — parent redoes the last undone dart/turn
   onMoreCommands,    // () — parent opens the commands submenu
   onChange,          // () — fires on every buffer change (digit, backspace, fast score)
   legRunningTotal = 0,
@@ -77,10 +89,15 @@ export function renderCalculator({
   display.appendChild(entered);
   root.appendChild(display);
 
-  // Half-height action row: 3 icon-only buttons.
-  // Each is half the height of a numpad row, full width split 3 ways.
+  // Half-height action row: 4 icon-only buttons.
+  // (Undo, Redo, SetScore, MoreCmds). Each is a quarter the
+  // width of a numpad row (full width split 4 ways), half the
+  // height. Undo sits in the leftmost position (the same slot
+  // the old Exit button used to occupy) so its placement is
+  // consistent with the per-turn command area. Redo is the
+  // immediate right of Undo.
   const actions = el('div', { class: 'calc-actions' });
-  for (const key of ['Exit', 'SetScore', 'MoreCmds']) {
+  for (const key of ['Undo', 'Redo', 'SetScore', 'MoreCmds']) {
     const btn = el('button', {
       class: 'calc-action-btn calc-action-' + key.toLowerCase(),
       'aria-label': ariaLabelFor(key),
@@ -121,7 +138,17 @@ export function renderCalculator({
     const w = btn.offsetWidth;
     const h = btn.offsetHeight;
     if (!w || !h) return; // hidden / not yet laid out
-    const target = Math.min(w, h) * 0.6;
+    // Per-button font-size multiplier. Most buttons use 0.6 (60%
+    // of nearest frame border), but the MoreCmds button gets a
+    // 1.15× boost because its three-dot ellipsis (⋯) reads
+    // visually smaller than the arrow characters used for the
+    // other action buttons (↶ ↷ ＝). Without the boost the dots
+    // look under-prominent on small viewports like 600×800.
+    let mult = 0.6;
+    if (btn.classList && btn.classList.contains('calc-action-morecmds')) {
+      mult = 0.6 * 1.15;
+    }
+    const target = Math.min(w, h) * mult;
     btn.style.fontSize = Math.round(target) + 'px';
   }
   // Fast-score columns: LEFT gets the first 4 (smaller numbers), RIGHT
@@ -223,8 +250,11 @@ export function renderCalculator({
   function handleAction(key) {
     const v = parseInt(buffer, 10);
     switch (key) {
-      case 'Exit':
-        if (onExit) onExit();
+      case 'Undo':
+        if (onUndo) onUndo();
+        break;
+      case 'Redo':
+        if (onRedo) onRedo();
         break;
       case 'SetScore':
         if (!Number.isFinite(v)) return;
@@ -275,7 +305,8 @@ function labelClass(label) {
 
 function ariaLabelFor(key) {
   switch (key) {
-    case 'Exit':     return 'Exit game';
+    case 'Undo':     return 'Undo last dart';
+    case 'Redo':     return 'Redo last undone dart';
     case 'SetScore': return 'Set score to entered value';
     case 'MoreCmds': return 'More commands';
     default:         return key;

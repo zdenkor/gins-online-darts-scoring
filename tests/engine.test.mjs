@@ -95,11 +95,16 @@ test('01 triple-out: T10 wins from 30', () => {
   assert.equal(g.players[0].legsWon, 1);
 });
 
-test('submitTurnTotal01 ignores per-dart-only variants', () => {
+test('submitTurnTotal01 accepts totals for all in/out variants (total-entry mode)', () => {
+  // The user prefers a single total-entry numpad for ALL in/out
+  // combinations (single-in/single-out, double-in/double-out,
+  // triple-in/master-out, etc.). The engine trusts the caller's
+  // total and applies it directly. DI/DO per-dart validation
+  // would require segment-tap entry, which the user does not want.
   const g = new01(['A'], { start: 501, variation: 'doubleInDoubleOut' });
   const r = submitTurnTotal01(g, 60);
-  assert.equal(r.events[0].type, 'ignored');
-  assert.equal(g.players[0].score, 501);
+  assert.equal(r.events[0].type, 'turn');
+  assert.equal(g.players[0].score, 441);
 });
 test('01 double-out: bust on 1 left', () => {
   const g = new01(['A'], { start: 21, doubleOut: true });
