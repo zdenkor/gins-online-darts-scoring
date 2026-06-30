@@ -5,6 +5,59 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 Versions follow [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 Source of truth for the current version: `VERSION` and `package.json`.
 
+## [0.5.5] - 2026-06-30
+
+Compact setup form (one-line "Label: Value" summary), responsive
+strip header (column-aligned labels at 1.2vh, data at 4vh),
+removed "Best of" / "To win" mode toggles, simplified Sets/Legs
+labels to "Sets, First to" / "Legs, First to", shared history
+header uses column-aligned 5-column grid (5-column grid for the
+header row matching the data row, with just "Scored" / "To go" /
+"Dart" labels — player names live in the scoreboard above), and
+container-type/size on the strip row was simplified to use plain
+`vh` (no `cqh` resolving to px) so font sizes are responsive at
+the source.
+
+### Compact one-line setup form
+- Each option now renders as `Label: Value` on a single horizontal
+  line (label muted small caps, value white big text) instead of
+  a vertical label + button group. Examples: `LEGS TO WIN: First
+  to 1`, `MODE: 501 · SI/SO`, `CHECKOUT HINTS: On`.
+- Saves ~5 vertical lines per option group on the setup screen.
+- All font sizes use `vh` units (1.5vh label, 2.4vh value) — no
+  px values.
+
+### Shared-history header — column-aligned labels
+- Header row is now a 5-column grid (1fr × 5) matching the data
+  rows below, with `text-align: center` on each cell. Each label
+  sits directly above its corresponding data value with pixel-
+  perfect x alignment.
+- Labels changed from `${p1.name} scored` to just `Scored` (and
+  same for P2) — player names are shown in the scoreboard above
+  the strip, not duplicated in the column header.
+- Header font is 1.2vh (~7.5px at 625vh viewport), data font is
+  4vh (~25px) — header is ~3.3x smaller than data, marking
+  columns without competing with the actual numbers.
+
+### Removed Best-of / To-win mode toggles
+- Deleted the `setsMode` and `legsMode` state fields and their
+  corresponding `setsModeRow` / `legsModeRow` toggle buttons from
+  the x01 setup form. Only the "first to" (to-win) mode is
+  supported, so the mode toggle is no longer needed.
+- Renamed "Sets" → "Sets, First to" and "Legs" → "Legs, First to"
+  so the user knows the value means "first player to win N".
+
+### Responsive font sizes throughout the strip
+- Shared-history cell text uses `4vh` (4% of viewport height)
+  so the font tracks the viewport directly — not a JS measurement
+  of the row height, not a `cqh` resolving to px. The source unit
+  is `vh`.
+- Header cells use `1.2vh` so the short labels (`Scored` / `To go`
+  / `Dart`) fit comfortably in their 20%-wide columns without
+  horizontal overflow.
+- At 800×600: header ~10px / data ~24px. At 1920×1080: header
+  ~13px / data ~43px. Scales linearly with viewport.
+
 ## [0.5.4] - 2026-06-30
 
 Edit-history highlight, sticky history header, no row padding.

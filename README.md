@@ -11,17 +11,17 @@ live in their own Google Drive `appDataFolder`. Peers connect peer-to-peer
 via WebRTC.
 
 - **Live**: https://zdenkor.github.io/gins-online-darts-scoring/
-- **Latest**: v0.5.4 (edit-history highlight, sticky history header, no row padding)
+- **Latest**: v0.5.5 (compact one-line setup form, column-aligned strip header, removed Best-of mode toggles)
 - **Repo**: https://github.com/zdenkor/gins-online-darts-scoring
 
 ---
 
-## What's new in v0.5.4
+## What's new in v0.5.5
 
-- **Edit-history highlight** — clicking a thrown value in the shared history now lights up that specific cell (column 1 or 4) with a green pulsing background so the user can see exactly which number is being edited. The remaining / round cells stay unchanged.
-- **Sticky history header** — `.sh-header` is `position: sticky; top: 0` so the column labels stay pinned at the top of the strip while the user scrolls through older rounds.
-- **History rows have no padding** — cells span the full row width and rely on their own `text-align` (left / center / right) to position content within their column.
-- **Auto-scroll for shared history** — new rounds auto-scroll into view, but the strip preserves the user's scroll position if they had scrolled up to read older rounds.
+- **Compact one-line setup form** — each option now renders as `Label: Value` on a single horizontal line (label muted small caps, value white big text) instead of a vertical label + button group. Examples: `LEGS TO WIN: First to 1`, `MODE: 501 · SI/SO`, `CHECKOUT HINTS: On`. Saves ~5 vertical lines per option group on the setup screen.
+- **Column-aligned strip header** — the shared-history header row uses a 5-column grid (1fr × 5) matching the data rows below, with each label (`Scored` / `To go` / `Dart`) sitting directly above its corresponding data value with pixel-perfect x alignment. Labels changed from `${p1.name} scored` to just `Scored` since player names live in the scoreboard above.
+- **Responsive `vh` font sizes** — strip header cells use `1.2vh`, data cells use `4vh` (no `cqh` resolving to px, no JS measurement). Scales linearly with viewport.
+- **Removed Best-of / To-win mode toggles** — only the "first to" (to-win) mode is supported. Sets / Legs labels simplified to "Sets, First to" / "Legs, First to".
 
 See `CHANGELOG.md` for the full release notes and prior versions.
 

@@ -435,8 +435,77 @@ main { flex: 1; padding: 16px; width: 100%; margin: 0 auto;
   font-weight: 600;
   box-shadow: 0 0 0 1px rgba(44,212,154,0.4) inset;
 }
+.field.button-row-field {
+  /* Single horizontal row: label on the left, button group on the
+     right, all on ONE line. Previously the label was on its own
+     line (`display: block` on the label) and the button group
+     below it, which made every option take two lines of vertical
+     space in the form. Putting them side-by-side compacts the
+     setup form to a single column of "label : value" rows. */
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  flex-wrap: nowrap;
+}
 .field.button-row-field label {
-  margin-bottom: 4px;
+  /* Inline label so it sits to the LEFT of the button group on
+     the same row. The user reads the form as "Legs to Win:
+     [button group]", "Mode: [button group]", etc. — each field
+     is one horizontal line. */
+  display: inline-block;
+  flex: 0 0 auto;
+  margin: 0;
+  font-size: 12px;
+  color: var(--muted);
+  text-transform: uppercase;
+  letter-spacing: .8px;
+  /* min-width ensures all labels in a column align vertically */
+  min-width: 14ch;
+  white-space: nowrap;
+}
+.field.button-row-field .btn-row.segmented {
+  flex: 1 1 auto;
+  flex-wrap: wrap;
+}
+
+/* Compact one-line option summary used by the game setup form.
+   Each row shows: small muted label "Legs to Win:" followed by
+   the current value as bigger white text "First to 1". This
+   compresses the form to a few lines instead of one button
+   group per option, making the whole setup fit on a single
+   screen. */
+.opts-summary {
+  display: flex;
+  flex-direction: column;
+  gap: 0.6em;
+  margin-bottom: 1.2em;
+}
+.opt-summary-row {
+  display: flex;
+  align-items: baseline;
+  gap: 0.8em;
+  padding: 0.4em 0;
+}
+.opt-summary-row .opt-label {
+  /* Same font size as the value so the row reads as a single
+     "Label: Value" line with consistent typography. The
+     color contrast (muted grey label + white value) is what
+     distinguishes them — no size mismatch. */
+  font-size: 2.4vh;
+  color: var(--muted);
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  flex: 0 0 auto;
+  white-space: nowrap;
+}
+.opt-summary-row .opt-value {
+  font-size: 2.4vh;
+  color: var(--text);
+  font-weight: 600;
+  flex: 1 1 auto;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
 }
 
 /* Generic input class — readable on dark background, white text. */
@@ -598,19 +667,17 @@ select.input option, select.dropdown-readable option {
 .shared-history-list::-webkit-scrollbar { display: none; }
 .shared-history-row {
   display: grid;
-  /* 5 columns with quintile column positions:
-       col 1: 0-25%   (P1 Scored,  text left-aligned at 0%)
-       col 2: 25-40%  (P1 To Go,   text right-aligned at 25%)
-       col 3: 40-60%  (DART,       text centered at 50%)
-       col 4: 60-75%  (P2 Scored,  text left-aligned at 75%)
-       col 5: 75-100% (P2 To Go,   text right-aligned at 100%)
-     The layout is perfectly symmetric around the 50% DART
-     centerline, with cell widths in a 25:15:20:15:25 ratio so
-     P1 Scored and P2 To Go mirror each other (both 25% wide),
-     and P1 To Go and P2 Scored mirror each other (both 15%). */
-  grid-template-columns: 25fr 15fr 20fr 15fr 25fr;
-  gap: 0.5%;                       /* ~ 0.5% of row width — fluid horizontal spacing */
-  align-items: center;
+  /* Five EQUAL-width columns for the 5 cells: P1 Scored | P1 To Go
+     | DART | P2 Scored | P2 To Go. Each cell gets the same 1fr share
+     of the row width (20% each), so the row reads as a clean
+     5-column ledger with even spacing. */
+  grid-template-columns: 1fr 1fr 1fr 1fr 1fr;
+  gap: 4px;
+    /* Bottom-align so the cqh-sized text (which sits on its baseline)
+       hugs the bottom of the row instead of leaving a half-row gap
+       above. The text glyphs occupy the line-box from baseline up,
+       so `end` places the baseline at the row's bottom edge. */
+    align-items: end;
   /* No row padding — cells span the full row width and rely on
      their own text-align (left / center / right) to position
      content within their column. The 4vh floor caps the row
@@ -641,15 +708,41 @@ select.input option, select.dropdown-readable option {
   position: sticky;
   top: 0;
   z-index: 1;
-  min-height: 0;
-  padding: 0.8% 2%;              /* fluid horizontal + vertical padding */
-  font-size: 70%;                /* 70% of parent — smaller than data rows */
+  /* 5-column grid matching the data rows below so each label sits
+     directly above its column:
+       col 1: "Scored"     (P1 thrown)
+       col 2: "To go"      (P1 remaining)
+       col 3: "Dart"       (round number)
+       col 4: "Scored"     (P2 thrown)
+       col 5: "To go"      (P2 remaining)
+     The data rows use `display: grid; grid-template-columns:
+     1fr 1fr 1fr 1fr 1fr` (inherited from .shared-history-row), so
+     the header inherits the same 5-column grid automatically. */
+  min-height: 2.4vh;              /* shorter than data rows (4vh) */
+  padding: 0;
   font-weight: 600;
   color: var(--muted);
   text-transform: uppercase;
   letter-spacing: 0.05em;         /* em-based letter-spacing, no px */
   border-bottom: 1px solid var(--line);
   background: var(--bg-2);
+}
+/* Header row's cells: same 5-column grid as the data rows, with
+   tiny uppercase labels centered in their columns. The
+   unsuffixed class names (.sh-thrown / .sh-remain / .sh-round)
+   don't get a `text-align` from the data-row rules (those target
+   .sh-thrown-p1 / .sh-thrown-p2 / .sh-remain-p1 / .sh-remain-p2),
+   so we set it explicitly here so the labels line up with the
+   centered data values below. */
+.shared-history-row.sh-header .sh-thrown,
+.shared-history-row.sh-header .sh-remain,
+.shared-history-row.sh-header .sh-round {
+  font-size: 1.2vh;
+  line-height: 1;
+  text-align: center;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
 }
 /* Active (current) round row — green highlight per user preference. */
 .shared-history-row.active {
@@ -672,11 +765,20 @@ select.input option, select.dropdown-readable option {
  * near edge). Numbers point outward toward the round indicator so
  * the eye can pair "thrown" with its matching "remaining" for each
  * player. */
-.shared-history-row .sh-thrown-p1 { text-align: left; }
-.shared-history-row .sh-thrown-p2 { text-align: right; color: var(--muted); }
+/* Layout: each cell is centered horizontally within its own 1fr
+ * column so the row reads as an even 5-column ledger (matches the
+ * mockup with P1 Scored | To Go | Darts | P2 Scored | To Go all
+ * centered under their respective columns). Thrown scores (the
+ * points just played in this round) are the primary data so they
+ * stay in white. Remaining scores are secondary context so they
+ * render in the muted grey — same color for both players, so the
+ * eye scans across the row at a single brightness per data type. */
+.shared-history-row .sh-thrown-p1 { text-align: center; color: var(--text); }
+.shared-history-row .sh-thrown-p2 { text-align: center; color: var(--text); }
 .shared-history-row .sh-remain {
   font-weight: 600;
-  text-align: right;
+  text-align: center;
+  color: var(--muted);
   min-width: 3ch;
 }
 .shared-history-row .sh-round {
@@ -691,6 +793,38 @@ select.input option, select.dropdown-readable option {
 .shared-history-row.bust .sh-remain { color: var(--danger); }
 .shared-history-row.win  .sh-remain { color: var(--good); }
 .shared-history-row.editable { cursor: pointer; }
+
+/* Data rows in the strip (placeholder rows + score rows) scale their
+   cell text to 4vh (4% of viewport height) — expressed as a
+   viewport-relative unit so the font size IS responsive at the
+   source, not just in the computed value. The value matches the
+   row's `min-height: 4vh` so the text fills the row vertically:
+   at 625px viewport height the text is 25px; at 1000px it's 40px.
+   No JS measurement, no px values: the source unit is `vh` so the
+   font tracks the viewport directly.
+
+   Header row is excluded because its column titles ("GIN SCORED",
+   "ALEX SCORED", etc.) are long words that don't fit in a 20%-wide
+   column at 4vh font. The header uses a smaller responsive size
+   (2.5vh) defined in `.shared-history-row.sh-header .sh-thrown` /
+   `.sh-remain` / `.sh-round` below.
+
+   Note: we target the SHORTER class names (.sh-thrown, .sh-remain,
+   .sh-round) rather than the player-suffixed ones (.sh-thrown-p1,
+   etc.) because placeholder rows and editable rows use the
+   unsuffixed classes for some cells. This single selector covers
+   all data-row cells. */
+.shared-history-row:not(.sh-header) .sh-thrown,
+.shared-history-row:not(.sh-header) .sh-remain,
+.shared-history-row:not(.sh-header) .sh-round {
+  font-size: 4vh;
+  line-height: 1;
+  /* Allow the text to overflow vertically if needed — the row's
+     min-height: 4vh guarantees visible space, and overflow:visible
+     lets the text render even when it slightly exceeds the row's
+     content box. */
+  overflow: visible;
+}
 
 /* Highlight the row + cell currently being edited from the history.
    The row gets a green tint; the specific thrown cell (columns 1

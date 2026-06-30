@@ -315,10 +315,9 @@ export function closeModal() {
 // any order they want.
 //
 // `state` is expected to expose at least:
-//   start, in, out, setsToWin, setsMode, legsToWin, legsMode,
+//   start, in, out, setsToWin, legsToWin, maxDartsPerLeg, showCheckout.
 //   maxDartsPerLeg, showCheckout
-// where `setsMode`/`legsMode` are 'best' | 'toWin'.
-//
+// x01GameOptionsControls expects a state object with at least:
 // Two conversions keep the displayed preset values consistent
 // across modes:
 //   best-of-N → win-count = ceil(N/2)
@@ -381,54 +380,32 @@ export function x01GameOptionsControls({ state, helpVisible, X01_IN_OPTIONS, X01
     state.out,
     v => { state.out = v; });
 
-  // Sets / Legs — each has a mode toggle (Best of / To win) and a
-  // numeric row whose presets swap with the mode. `state.setsMode`
-  // / `state.legsMode` default to 'best' (added by the caller).
-  // The numeric rows are built AFTER the mode rows because the mode
-  // toggles need to call `.refresh()` on them.
-  const sets = capButtonRow({
-    label: labelWithHelp('Sets', 'Sets',
-      'How many sets determine the match. Best of / To win mode (above) decides how the number is read.',
-      helpVisible),
-    presets: x01PresetsForMode(state.setsMode),
-    value: x01WinCountToPreset(state.setsToWin, state.setsMode),
-    onChange: v => {
-    state.setsToWin = x01PresetToWinCount(v, state.setsMode);
-    },
-  });
-  const setsModeRow = buttonRow(
-    labelWithHelp('Sets mode', 'Sets mode',
-      'How to count sets. "Best of N" plays up to N sets and the higher score wins. "To win N" stops as soon as one player reaches N sets.',
-      helpVisible),
-    [{ value: 'best', label: 'Best of' }, { value: 'toWin', label: 'To win' }],
-    v => {
-      state.setsMode = v;
-      sets.wrap.setPresets(x01PresetsForMode(v));
-      sets.wrap.refresh(x01WinCountToPreset(state.setsToWin, v));
+  // Sets / Legs — only the "first to" (to-win) mode is supported, so
+    // each row is just a numeric cap with the mode baked in. The label
+    // says so explicitly ("Sets, First to" / "Legs, First to") so the
+    // user knows the value means "first player to win N takes the
+    // match / set".
+    const sets = capButtonRow({
+      label: labelWithHelp('Sets, First to', 'Sets, First to',
+        'How many sets a player must win to take the match. The first to reach this count wins.',
+        helpVisible),
+      presets: x01PresetsForMode('toWin'),
+      value: x01WinCountToPreset(state.setsToWin, 'toWin'),
+      onChange: v => {
+        state.setsToWin = x01PresetToWinCount(v, 'toWin');
       },
-    state.setsMode);
+    });
 
-  const legs = capButtonRow({
-    label: labelWithHelp('Legs', 'Legs',
-      'How many legs determine the set. Best of / To win mode (above) decides how the number is read.',
-      helpVisible),
-    presets: x01PresetsForMode(state.legsMode),
-    value: x01WinCountToPreset(state.legsToWin, state.legsMode),
-    onChange: v => {
-      state.legsToWin = x01PresetToWinCount(v, state.legsMode);
-    },
-  });
-  const legsModeRow = buttonRow(
-    labelWithHelp('Legs mode', 'Legs mode',
-      'How to count legs. "Best of N" plays up to N legs and the higher score wins. "To win N" stops as soon as one player reaches N legs.',
-      helpVisible),
-    [{ value: 'best', label: 'Best of' }, { value: 'toWin', label: 'To win' }],
-    v => {
-      state.legsMode = v;
-      legs.wrap.setPresets(x01PresetsForMode(v));
-      legs.wrap.refresh(x01WinCountToPreset(state.legsToWin, v));
+    const legs = capButtonRow({
+      label: labelWithHelp('Legs, First to', 'Legs, First to',
+        'How many legs a player must win to take the set. The first to reach this count wins.',
+        helpVisible),
+      presets: x01PresetsForMode('toWin'),
+      value: x01WinCountToPreset(state.legsToWin, 'toWin'),
+      onChange: v => {
+        state.legsToWin = x01PresetToWinCount(v, 'toWin');
       },
-    state.legsMode);
+    });
 
   // Max darts per leg
   const capRow = capButtonRow({
@@ -457,8 +434,8 @@ export function x01GameOptionsControls({ state, helpVisible, X01_IN_OPTIONS, X01
     String(state.showCheckout));
 
   return {
-    startRow, inRow, outRow,
-    setsModeRow, sets, legsModeRow, legs,
-    capRow, checkoutRow,
-  };
-}
+      startRow, inRow, outRow,
+      sets, legs,
+      capRow, checkoutRow,
+    };
+  }

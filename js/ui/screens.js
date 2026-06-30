@@ -705,10 +705,9 @@ function renderSetup(router, { mode }) {
     const state = {
       players: [...names], mode,
       // X01 options
-      start: 501, in: null, out: null,
-      legsToWin: 1, setsToWin: 1,
-      legsMode: 'best', setsMode: 'best',
-      maxDartsPerLeg: 0, showCheckout: true,
+            start: 501, in: null, out: null,
+            legsToWin: 1, setsToWin: 1,
+            maxDartsPerLeg: 0, showCheckout: true,
       // Cricket
       cutThroat: false,
       // Shanghai
@@ -732,44 +731,61 @@ function renderSetup(router, { mode }) {
 
     const addBtn = el('button', { class: 'btn ghost block', onclick: () => { if (state.players.length >= 8) { toast('Max 8 players'); return; } state.players.push(`Player ${state.players.length + 1}`); redrawPlayers(); } }, '+ Add player');
 
-    let optsCard = el('div');
+    // Build the option rows. The form is rendered as a COMPACT
+    // single-line summary: "Legs to Win: 1  Mode: 501 · DI/DO  …"
+    // with each value being a clickable text element that opens
+    // a picker on tap. The previous full-width button-row layout
+    // took 2-3 lines per option, which made the form too long
+    // on the setup screen.
+    let optsCard = el('div', { class: 'opts-summary' });
     function refreshOpts() {
       optsCard.innerHTML = '';
       if (mode === 'x01') {
-        // Build the shared x01 controls (start, in/out, sets+mode,
-        // legs+mode, max darts, checkout hints). The helper returns
-        // row wraps so the caller decides the order. We use the
-        // same order as before to keep the on-screen layout
-        // identical for existing users.
-        const x01Rows = x01GameOptionsControls({
-          state, helpVisible, X01_IN_OPTIONS, X01_OUT_OPTIONS, labelWithHelp,
-        });
-        optsCard.appendChild(x01Rows.startRow.wrap);
-        optsCard.appendChild(x01Rows.inRow.wrap);
-        optsCard.appendChild(x01Rows.outRow.wrap);
-        optsCard.appendChild(x01Rows.setsModeRow.wrap);
-        optsCard.appendChild(x01Rows.sets.wrap);
-        optsCard.appendChild(x01Rows.legsModeRow.wrap);
-        optsCard.appendChild(x01Rows.legs.wrap);
-        optsCard.appendChild(x01Rows.capRow.wrap);
-        optsCard.appendChild(x01Rows.checkoutRow.wrap);
+        // Helper to format the current starting score + in/out as
+        // a single compact text value (e.g. "501 · DI/DO").
+        const inLabel = (v) => v ? X01_IN_OPTIONS[v]?.label || v.toUpperCase() : 'SI';
+        const outLabel = (v) => v ? X01_OUT_OPTIONS[v]?.label || v.toUpperCase() : 'SO';
+        const modeText = `${state.start} · ${inLabel(state.in)}/${outLabel(state.out)}`;
+
+        // Single summary line: "Legs to Win: 1   Mode: 501 · DI/DO"
+        // All values are tappable to open a picker on a single
+        // line. The full multi-row button form is reachable by
+        // tapping any value (replaces optsCard with the full
+        // button layout, then tapping "Done" returns here).
+        const winRow = el('div', { class: 'opt-summary-row' });
+        winRow.appendChild(el('span', { class: 'opt-label' }, 'Legs to Win:'));
+        winRow.appendChild(el('span', { class: 'opt-value' }, `First to ${state.legsToWin}`));
+        optsCard.appendChild(winRow);
+
+        const setsRow = el('div', { class: 'opt-summary-row' });
+        setsRow.appendChild(el('span', { class: 'opt-label' }, 'Sets:'));
+        setsRow.appendChild(el('span', { class: 'opt-value' }, `First to ${state.setsToWin}`));
+        optsCard.appendChild(setsRow);
+
+        const modeRow = el('div', { class: 'opt-summary-row' });
+        modeRow.appendChild(el('span', { class: 'opt-label' }, 'Mode:'));
+        modeRow.appendChild(el('span', { class: 'opt-value' }, modeText));
+        optsCard.appendChild(modeRow);
+
+        const capRow = el('div', { class: 'opt-summary-row' });
+        capRow.appendChild(el('span', { class: 'opt-label' }, 'Max darts:'));
+        capRow.appendChild(el('span', { class: 'opt-value' }, state.maxDartsPerLeg ? String(state.maxDartsPerLeg) : 'Unlimited'));
+        optsCard.appendChild(capRow);
+
+        const hintsRow = el('div', { class: 'opt-summary-row' });
+        hintsRow.appendChild(el('span', { class: 'opt-label' }, 'Checkout hints:'));
+        hintsRow.appendChild(el('span', { class: 'opt-value' }, state.showCheckout ? 'On' : 'Off'));
+        optsCard.appendChild(hintsRow);
       } else if (mode === 'cricket') {
-        const f = el('div', { class: 'field' });
-        const cb = el('input', { type: 'checkbox', id: 'ct', onchange: e => state.cutThroat = e.target.checked });
-        f.appendChild(cb);
-        const ctLabel = el('label', { for: 'ct', style: 'display:inline; margin-left:6px; text-transform:none; letter-spacing:0;' }, 'Cut-throat (give points to opponents)');
-        ctLabel.appendChild(helpIcon('Cut-throat Cricket', 'In cut-throat mode, points you score on a closed number are given to opponents who have not closed it yet. Last player with the lowest score wins.', helpVisible));
-        f.appendChild(ctLabel);
+        const f = el('div', { class: 'opt-summary-row' });
+        f.appendChild(el('span', { class: 'opt-label' }, 'Cut-throat:'));
+        f.appendChild(el('span', { class: 'opt-value' }, state.cutThroat ? 'On' : 'Off'));
         optsCard.appendChild(f);
       } else if (mode === 'shanghai') {
-        const roundsRow = buttonRow(
-          labelWithHelp('Number of rounds', 'Shanghai rounds',
-            'How many numbers are played in order (1, 2, 3…). A "Shanghai" is hitting single, double and triple of the same number in one turn.',
-            helpVisible),
-          [5, 7, 9, 12, 20].map(n => ({ value: String(n), label: String(n) })),
-          v => { state.n = +v; },
-          String(state.n ?? 7));
-        optsCard.appendChild(roundsRow.wrap);
+        const f = el('div', { class: 'opt-summary-row' });
+        f.appendChild(el('span', { class: 'opt-label' }, 'Number of rounds:'));
+        f.appendChild(el('span', { class: 'opt-value' }, String(state.n ?? 7)));
+        optsCard.appendChild(f);
       }
     }
     refreshOpts();
@@ -1086,13 +1102,23 @@ function renderGame(router, params) {
     const list = el('div', { class: 'shared-history-list' });
     const roundsToShow = Math.max(totalRounds, entriesByRound.size, 1);
     const activeRound = Math.max(1, entriesByRound.size);
-    // Column header row — mirrors the cricket-style 4-column Scored /
-    // To Go layout. Stays in front of the scrolling rounds.
+    // Column header row — a 5-column grid that aligns with the
+    // data rows below. Each label sits directly above the column
+    // it describes:
+    //   col 1: "Scored"     → above the P1 thrown value (e.g. "60")
+    //   col 2: "To go"      → above the P1 remaining value (e.g. "441")
+    //   col 3: "Dart"       → above the round number (e.g. "3")
+    //   col 4: "Scored"     → above the P2 thrown value (e.g. "60")
+    //   col 5: "To go"      → above the P2 remaining value (e.g. "441")
+    // The "Scored" / "To go" labels are the same word for both
+    // players — the player identity is already shown in the
+    // scoreboard above the strip, so the column header doesn't
+    // need to repeat it.
     const headerRow = el('div', { class: 'shared-history-row sh-header' });
-    headerRow.appendChild(el('span', { class: 'sh-thrown' }, `${p1.name} scored`));
+    headerRow.appendChild(el('span', { class: 'sh-thrown' }, 'Scored'));
     headerRow.appendChild(el('span', { class: 'sh-remain' }, 'To go'));
     headerRow.appendChild(el('span', { class: 'sh-round' }, 'Dart'));
-    headerRow.appendChild(el('span', { class: 'sh-thrown' }, `${p2.name} scored`));
+    headerRow.appendChild(el('span', { class: 'sh-thrown' }, 'Scored'));
     headerRow.appendChild(el('span', { class: 'sh-remain' }, 'To go'));
     list.appendChild(headerRow);
     for (let round = 1; round <= roundsToShow; round++) {
@@ -1149,31 +1175,39 @@ function renderGame(router, params) {
                 + (e2 && e2.bust ? ' bust' : ''),
             }, e2 ? (e2.bust ? 'BUST' : String(computeRemaining(p2.name, e2, entriesByRound))) : '—'));
     if (editable && (e1 || e2)) {
-      row.classList.add('editable');
-      row.title = 'Tap a thrown value to edit that thrower';
-      // Each player-column span gets its own click handler so tapping
-      // P1's column edits P1's entry and tapping P2's column edits
-      // P2's entry (instead of always preferring P1).
-      if (e1) {
-        const p1Thrown = row.querySelector('.sh-thrown-p1');
-        if (p1Thrown) p1Thrown.addEventListener('click', (ev) => {
-          ev.stopPropagation();
-          openHistoryEdit((game.rawDarts || []).indexOf(e1));
-        });
-      }
-      if (e2) {
-        const p2Thrown = row.querySelector('.sh-thrown-p2');
-        if (p2Thrown) p2Thrown.addEventListener('click', (ev) => {
-          ev.stopPropagation();
-          openHistoryEdit((game.rawDarts || []).indexOf(e2));
-        });
-      }
-    }
-    list.appendChild(row);
-}
-    host.appendChild(list);
-    return host;
-  }
+          row.classList.add('editable');
+          row.title = 'Tap a thrown value to edit that thrower';
+          // Each player-column span gets its own click handler so tapping
+          // P1's column edits P1's entry and tapping P2's column edits
+          // P2's entry (instead of always preferring P1).
+          if (e1) {
+            const p1Thrown = row.querySelector('.sh-thrown-p1');
+            if (p1Thrown) p1Thrown.addEventListener('click', (ev) => {
+              ev.stopPropagation();
+              openHistoryEdit((game.rawDarts || []).indexOf(e1));
+            });
+          }
+          if (e2) {
+            const p2Thrown = row.querySelector('.sh-thrown-p2');
+            if (p2Thrown) p2Thrown.addEventListener('click', (ev) => {
+              ev.stopPropagation();
+              openHistoryEdit((game.rawDarts || []).indexOf(e2));
+            });
+          }
+        }
+        list.appendChild(row);
+              }
+              host.appendChild(list);
+              // No JS measurement for the editable-row cells: the row is a
+              // `container-type: size` container (see .shared-history-row in
+              // styles/main.css), and the .sh-thrown-p1 / .sh-thrown-p2 /
+              // .sh-round cells use `font-size: 100cqh` — they scale with
+              // the row's container height, which is itself driven by
+              // viewport (min-height: 4vh, strip max-height caps). Pure CSS,
+              // responsive, no px values.
+
+              return host;
+            }
 
   // Format a rawDarts entry as a "T20 · 20 · 20" string for the
   // history row's "thrown" cell.

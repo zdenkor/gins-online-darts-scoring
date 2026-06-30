@@ -434,10 +434,8 @@ export async function renderCompNew(router, { kind, edit }) {
           cutThroat: editing.gameOpts?.cutThroat ?? false,
           shanghaiN: editing.gameOpts?.shanghaiN || 7,
           legsToWin: editing.legsToWin || 1,
-          setsToWin: editing.setsToWin || 1,
-          legsMode: editing.legsMode || 'best',
-          setsMode: editing.setsMode || 'best',
-          maxDartsPerLeg: editing.gameOpts?.maxDartsPerLeg || 0,
+                    setsToWin: editing.setsToWin || 1,
+                    maxDartsPerLeg: editing.gameOpts?.maxDartsPerLeg || 0,
           seeding: editing.seeding || 'ordered',
           groups: editing.groups || 1,
           advancePerGroup: editing.advancePerGroup || 2,
@@ -458,10 +456,8 @@ export async function renderCompNew(router, { kind, edit }) {
           cutThroat: false,
           shanghaiN: 7,
           legsToWin: 1,
-          setsToWin: 1,
-          legsMode: 'best',
-          setsMode: 'best',
-          maxDartsPerLeg: 0,
+                    setsToWin: 1,
+                    maxDartsPerLeg: 0,
           seeding: 'ordered',
           groups: 1,
           advancePerGroup: 2,
@@ -707,11 +703,11 @@ export async function renderCompNew(router, { kind, edit }) {
           state, helpVisible, X01_IN_OPTIONS, X01_OUT_OPTIONS, labelWithHelp,
         });
         gameOpts.append(
-          startRow.wrap,
-          x01Rows.inRow.wrap, x01Rows.outRow.wrap,
-          x01Rows.setsModeRow.wrap, x01Rows.sets.wrap,
-          x01Rows.legsModeRow.wrap, x01Rows.legs.wrap,
-          x01Rows.capRow.wrap,
+                  startRow.wrap,
+                  x01Rows.inRow.wrap, x01Rows.outRow.wrap,
+                  x01Rows.sets.wrap,
+                  x01Rows.legs.wrap,
+                  x01Rows.capRow.wrap,
         );
       } else if (state.gameMode === 'cricket') {
         const cb = checkbox('Cut-throat', state.cutThroat, v => state.cutThroat = v);
@@ -1365,10 +1361,8 @@ unmatched.forEach(u => {
             setsToWin: state.setsToWin,
           };
           editing.legsToWin = state.legsToWin;
-          editing.setsToWin = state.setsToWin;
-          editing.legsMode = state.legsMode;
-          editing.setsMode = state.setsMode;
-          await put('competitions', editing);
+                    editing.setsToWin = state.setsToWin;
+                    await put('competitions', editing);
           if (await isSignedIn()) {
             try {
               const allMatches = (await getAll('matches')).filter(m => m.competitionId === editing.id);
