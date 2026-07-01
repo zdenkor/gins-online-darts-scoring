@@ -1464,11 +1464,17 @@ footer.app-footer .version {
   /* Font scales with viewport height (vh) for a predictable
      percentage-of-frame feel. Sized at ~80% of the previous
      default so the five action icons fit on one row even on
-     narrow phones without wrapping. */
+     narrow phones without wrapping. max-height: 4vh !important
+     matches the numpad's 4.5vh cap (slightly tighter because
+     the action row is half the numpad row height). With
+     max-height locked, fitFontToFrame() can push the
+     font-size up to 100% of the frame (mult = 1.0) without
+     inflating the button itself — the cap-height then
+     fills the locked frame. */
   font-size: clamp(13px, 3.4vh, 22px); font-weight: 700; line-height: 1;
   user-select: none; -webkit-tap-highlight-color: transparent;
-  min-height: 48px;
-  padding: 8px 2px;
+  min-height: 4vh; max-height: 4vh;
+  padding: 2px;
   transition: background .12s ease, transform .06s ease;
 }
 .calc-action-btn:hover { background: #2c374f; }

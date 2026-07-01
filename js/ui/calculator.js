@@ -168,14 +168,11 @@ export function renderCalculator({
     // 60% of the button without strain.
     //
     // The action-row icons (Undo, Redo, SetScore, Zero,
-    // MoreCmds) use 1.0 (100%) — but the cap-height of the
-    // glyph is only ~70% of the font-size (the rest is
-    // ascender/descender space), so a multiplier of 1.0 makes
-    // the *visible* icon fill ~70% of the button. The user
-    // wants the icon glyphs to fill the button visually; 1.0
-    // hits the sweet spot where the cap-height ≈ the button
-    // height and the icon reads as "filling the frame" without
-    // overflowing the padding.
+    // MoreCmds) use 1.0 (100%) — the .calc-action-btn CSS
+    // locks the button height with max-height: 4vh !important,
+    // so pushing font-size up to 100% of the frame does NOT
+    // inflate the button. The visible glyph (cap-height) then
+    // fills the locked frame.
     // MoreCmds also gets an additional 1.15× boost because its
     // three-dot ellipsis (⋯) reads visually smaller than the
     // arrow characters (↶ ↷ ＝) and the double-zero SVG.
