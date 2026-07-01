@@ -519,3 +519,42 @@ test('maxCheckoutAttemptsForX01: leg-win with meta.isLegWin=false but D2=0 still
   // up the leg-win branch.
   assert.equal(maxCheckoutAttemptsForX01(40, 40, { in: 'single', out: 'double' }, false), 3);
 });
+
+/* ---------- maxCheckoutAttemptsForX01: TO (Triple Out) ----------
+   1-dart TO finisher = T1..T20 (3, 6, ..., 60) OR D-BULL (50).
+   NOT singles, NOT doubles 1..20. (Unlike MO which allows D,
+   here only T and D-BULL are legal finishers.) */
+test('maxCheckoutAttemptsForX01: TO — leg-win counts by budget', () => {
+  const inOut = { in: 'single', out: 'triple' };
+  // 1-dart TO finish (C2 divisible by 3 and <=60, OR C2=50)
+  assert.equal(maxCheckoutAttemptsForX01(60, 60, inOut, true), 3);  // T20
+  assert.equal(maxCheckoutAttemptsForX01(50, 50, inOut, true), 3);  // D-BULL
+  assert.equal(maxCheckoutAttemptsForX01(30, 30, inOut, true), 3);  // T10
+  assert.equal(maxCheckoutAttemptsForX01(3,  3,  inOut, true), 3);  // T1
+  // 2-dart TO finish (C2<=120, e.g. 40 = T10+T10 last-T valid)
+  assert.equal(maxCheckoutAttemptsForX01(40, 40, inOut, true), 2);
+  // 3-dart TO finish (C2>120)
+  assert.equal(maxCheckoutAttemptsForX01(170, 170, inOut, true), 1);
+});
+test('maxCheckoutAttemptsForX01: TO — non-leg-win gates by C2 >= B2-60', () => {
+  const inOut = { in: 'single', out: 'triple' };
+  // 1-dart target (B2<=60 divisible by 3, OR B2=50) → max=3
+  assert.equal(maxCheckoutAttemptsForX01(60, 0,  inOut, false), 3);
+  assert.equal(maxCheckoutAttemptsForX01(50, 0,  inOut, false), 3);
+  assert.equal(maxCheckoutAttemptsForX01(30, 0,  inOut, false), 3);
+  // NOT 1-dart: 40 (D20), 25 (S-BULL)
+  assert.equal(maxCheckoutAttemptsForX01(40, 0,  inOut, false), 0);
+  assert.equal(maxCheckoutAttemptsForX01(25, 0,  inOut, false), 0);
+  // 2-dart target (B2<=120): C2>=B2-60 → max=2
+  assert.equal(maxCheckoutAttemptsForX01(120, 60, inOut, false), 2); // 60>=60
+  assert.equal(maxCheckoutAttemptsForX01(120, 59, inOut, false), 0); // 59<60
+  // 3-dart target (B2 in {121..180}): C2>=B2-60 → max=1
+  assert.equal(maxCheckoutAttemptsForX01(170, 130, inOut, false), 1);
+  assert.equal(maxCheckoutAttemptsForX01(170, 109, inOut, false), 0);
+});
+test('maxCheckoutAttemptsForX01: TO — guards: D2=1 or D2=2 returns 0', () => {
+  // 1 and 2 are too small for any 1-dart TO close (T1=3 minimum).
+  assert.equal(maxCheckoutAttemptsForX01(50, 49, { in: 'single', out: 'triple' }, false), 0);
+  assert.equal(maxCheckoutAttemptsForX01(50, 48, { in: 'single', out: 'triple' }, false), 0);
+  assert.equal(maxCheckoutAttemptsForX01(60, 57, { in: 'single', out: 'triple' }, false), 3); // D2=3
+});

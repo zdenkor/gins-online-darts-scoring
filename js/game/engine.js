@@ -108,7 +108,10 @@ function opensScoring(d, inRule) {
 }
 function finishesLeg(d, outRule) {
   if (outRule === 'double') return isDouble(d);
-  if (outRule === 'triple') return isTriple(d);
+  // Triple Out: the last dart must be a triple (T1..T20) or the
+  // double bull (D25 = 50). Singles and doubles 1..20 are NOT
+  // legal finishers — that's the standard "triple out" rule.
+  if (outRule === 'triple') return isTriple(d) || (d.segment === 25 && d.multiplier === 2);
   if (outRule === 'master') return isMasterOutHit(d);
   return true;
 }
@@ -1002,21 +1005,38 @@ export function maxCheckoutAttemptsForX01(target, total, inOut, isLegWin = false
     return 0;
   }
 
-  // out=triple (no Excel formula provided yet) — fall back to
-  // the SO behaviour as a reasonable default. Can be tightened
-  // once a per-out triple formula is added.
+  // out=triple (TO) — 1-dart finisher = T1..T20 (3, 6, ..., 60)
+  // OR D-BULL (= 50). NOT singles, NOT doubles 1..20.
   if (out === 'triple') {
     if (isLeg) {
-      if (C2 <= 60) return 3;
+      // C2 is a 1-dart TO finish iff C2<=60 and divisible by 3,
+      // OR C2=50 (D-BULL).
+      if (C2 <= 60 && (C2 % 3 === 0 || C2 === 50)) return 3;
       if (C2 <= 120) return 2;
       return 1;
     }
-    if (B2 > 180 || D2 < 0) return 0;
-    if (B2 <= 60) return 3;
+    // Non-leg-win guards: target out of range, bust, or remaining
+    // too small for any TO finish (1 and 2 can't be closed even
+    // with a T).
+    if (B2 > 180 || D2 < 0 || D2 === 1 || D2 === 2) return 0;
+    // 1-dart TO target: B2<=60 and divisible by 3, OR B2=50.
+    // (If B2<=60 but NOT a 1-dart finisher — e.g. 25, 40 — the
+    // target is unclosable on a single dart and we need 2+ darts
+    // even with a 3-dart turn. The Excel formula has no
+    // intermediate max=2 for these; we return 0 here and rely on
+    // gate 2 of shouldAskCheckout to skip the modal for
+    // non-3-dart-closable targets.)
+    if (B2 <= 60) {
+      if (B2 % 3 === 0 || B2 === 50) return 3;
+      return 0;
+    }
     if (B2 <= 120) {
+      // 2-dart TO target — needs C2 >= B2-60 for a 1-dart close
+      // to be available on the remaining
       if (C2 >= (B2 - 60)) return 2;
       return 0;
     }
+    // 3-dart TO target — needs C2 >= B2-60 for a 1-dart close
     if (C2 >= (B2 - 60)) return 1;
     return 0;
   }
@@ -1108,9 +1128,13 @@ const UNCLOSABLE = {
     3: new Set([0, 1, 163, 166, 169, 172, 173, 175, 176, 178, 179]),
   },
   triple: {
+    // budget=1: 1-dart TO finishers = T1..T20 (3, 6, ..., 60) +
+    // D25 (= 50). 1, 2 and 25 (S-BULL) are NOT legal finishers.
+    // (Unlike the old definition which excluded 50; the new
+    // rule is "triple or D-BULL".)
     1: new Set([
-      1, 2, 4, 5, 7, 8, 10, 11, 13, 14, 16, 17, 19, 20, 22, 23, 25, 26, 28,
-      29, 31, 32, 34, 35, 37, 38, 40, 41, 43, 44, 46, 47, 49, 50, 52, 53,
+      0, 1, 2, 4, 5, 7, 8, 10, 11, 13, 14, 16, 17, 19, 20, 22, 23, 25, 26, 28,
+      29, 31, 32, 34, 35, 37, 38, 40, 41, 43, 44, 46, 47, 49, 52, 53,
       55, 56, 58, 59, 61, 62, 63, 64, 65, 66, 67, 68, 69, 70, 71, 72, 73,
       74, 75, 76, 77, 78, 79, 80, 81, 82, 83, 84, 85, 86, 87, 88, 89, 90,
       91, 92, 93, 94, 95, 96, 97, 98, 99, 100, 101, 102, 103, 104, 105, 106,
@@ -1122,13 +1146,13 @@ const UNCLOSABLE = {
       177, 178, 179, 180,
     ]),
     2: new Set([
-      1, 2, 103, 106, 109, 112, 113, 115, 116, 118, 119, 121, 122, 123, 124,
+      0, 1, 2, 103, 106, 109, 112, 113, 115, 116, 118, 119, 121, 122, 123, 124,
       125, 126, 127, 128, 129, 130, 131, 132, 133, 134, 135, 136, 137, 138,
       139, 140, 141, 142, 143, 144, 145, 146, 147, 148, 149, 150, 151, 152,
       153, 154, 155, 156, 157, 158, 159, 160, 161, 162, 163, 164, 165, 166,
       167, 168, 169, 170, 171, 172, 173, 174, 175, 176, 177, 178, 179, 180,
     ]),
-    3: new Set([1, 2, 163, 166, 169, 172, 173, 175, 176, 178, 179]),
+    3: new Set([0, 1, 2, 163, 166, 169, 172, 173, 175, 176, 178, 179]),
   },
 };
 /* =================================================================
