@@ -406,13 +406,16 @@ export function x01GameOptionsControls({ state, helpVisible, X01_IN_OPTIONS, X01
   // Starting score
   const startRow = buttonRow(
     labelWithHelp('Starting score', 'Starting score',
-      'The score each player begins with. Lower numbers make games faster; 501 is the classic start.',
+      'The score each player begins with. Lower numbers make games faster; 501 is the classic start. 170 is a single-dart training preset (one max-dart throw to check out). 1001 is a long format.',
       helpVisible),
     [
-      { value: '301', label: '301' },
-      { value: '501', label: '501' },
-      { value: '701', label: '701' },
-      { value: '901', label: '901' },
+      { value: '121',  label: '121'  },
+      { value: '170',  label: '170'  },
+      { value: '301',  label: '301'  },
+      { value: '501',  label: '501'  },
+      { value: '701',  label: '701'  },
+      { value: '901',  label: '901'  },
+      { value: '1001', label: '1001' },
     ],
     v => { state.start = +v; },
     String(state.start));
