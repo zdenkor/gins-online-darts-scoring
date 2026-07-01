@@ -417,20 +417,27 @@ export function x01GameOptionsControls({ state, helpVisible, X01_IN_OPTIONS, X01
     v => { state.start = +v; },
     String(state.start));
 
-  // In/Out rules
-  const inOptions = Object.entries(X01_IN_OPTIONS).map(([value, { label }]) => ({ value, label }));
+  // In/Out rules — Single (SI/SO) is hidden from the setup UI per
+  // the user's product decision. Engine still falls back to
+  // single in x01InOutFlags() if in/out is null, so legacy saved
+  // games continue to work.
+  const inOptions = Object.entries(X01_IN_OPTIONS)
+    .filter(([value]) => value !== 'single')
+    .map(([value, { label }]) => ({ value, label }));
   const inRow = toggleRow(
     labelWithHelp('In', 'In rule',
-      'SI = any dart opens scoring. DI/TI/MI = double/triple/master required to start scoring. Tap again to turn off.',
+      'DI/TI/MI = double/triple/master required to start scoring. Tap again to turn off. (SI is the default if nothing is selected.)',
       helpVisible),
     inOptions,
     state.in,
     v => { state.in = v; });
 
-  const outOptions = Object.entries(X01_OUT_OPTIONS).map(([value, { label }]) => ({ value, label }));
+  const outOptions = Object.entries(X01_OUT_OPTIONS)
+    .filter(([value]) => value !== 'single')
+    .map(([value, { label }]) => ({ value, label }));
   const outRow = toggleRow(
     labelWithHelp('Out', 'Out rule',
-      'SO = any dart can finish. DO/TO/MO = double/triple/master required to finish. Tap again to turn off.',
+      'DO/TO/MO = double/triple/master required to finish. Tap again to turn off. (SO is the default if nothing is selected, but DO is pre-selected as the standard x01 default.)',
       helpVisible),
     outOptions,
     state.out,

@@ -898,8 +898,9 @@ function renderSetup(router, { mode }) {
     }
     const state = {
       players: [...names], mode,
-      // X01 options
-            start: 501, in: null, out: null,
+      // X01 options. In defaults to null (engine falls back to SI).
+      // Out defaults to 'double' (DO) — the standard x01 default.
+            start: 501, in: null, out: 'double',
             legsToWin: 1, setsToWin: 1,
             maxDartsPerLeg: 0, showCheckout: true,
       // Cricket
