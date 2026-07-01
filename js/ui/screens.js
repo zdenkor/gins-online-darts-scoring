@@ -3,7 +3,7 @@
 // competitions / admin screens. No framework.
 // =================================================================
 
-import { el, toast, copyToClipboard, formatDuration, showModal, closeModal, buttonRow, capButtonRow, toggleRow, x01GameOptionsControls } from '../util/helpers.js';
+import { el, toast, copyToClipboard, formatDuration, showModal, closeModal, buttonRow, capButtonRow, toggleRow, x01GameOptionsControls, renderScreenHeader, fullscreenButton } from '../util/helpers.js';
 import { enableDebugOverlay, disableDebugOverlay, isDebugOverlayOn } from '../util/debug-overlay.js';
 import { store, getStats, saveLastGame, recordGameResult, loadLastGame, getGameHistory, loadUiStatsSettings, saveUiStatsSettings } from '../util/store.js';
 import { HostRoom, GuestRoom } from '../net/rtc.js';
@@ -479,7 +479,7 @@ function renderGoogleSetup(router) {
 /* ----- Settings ----- */
 function renderSettings(router) {
   const screen = el('section', { class: 'screen active settings' });
-  screen.appendChild(el('h2', {}, 'Settings'));
+  screen.appendChild(renderScreenHeader('Settings'));
   screen.appendChild(el('p', { class: 'muted', style: 'margin-top: -8px; margin-bottom: 16px;' },
     'App preferences, sign-in, and about info.'));
 
@@ -814,7 +814,12 @@ function renderSettings(router) {
 /* ----- Menu ----- */
 function renderMenu(router) {
   const screen = el('section', { class: 'screen active menu' });
-  screen.appendChild(el('h2', {}, _ctx.user ? `Welcome, ${_ctx.user.displayName}` : 'Pick a game'));
+  // Header bar with title + fullscreen button. Replaces the bare
+  // h2 so the fullscreen toggle is reachable from the home screen
+  // (it lives in the game toolbar too, but the menu is the most
+  // common entry point).
+  const titleText = _ctx.user ? `Welcome, ${_ctx.user.displayName}` : 'Pick a game';
+  screen.appendChild(renderScreenHeader(titleText));
   screen.appendChild(el('p', { class: 'lede' }, 'Pass the device around locally, or open an online room and play with friends anywhere.'));
 
   // If there's a saved unfinished game, surface a Resume tile at the
@@ -872,7 +877,7 @@ function labelWithHelp(text, topic, htmlOrText, helpVisible) {
 
 function renderSetup(router, { mode }) {
   const screen = el('section', { class: 'screen active' });
-  screen.appendChild(el('h2', {}, 'Game setup'));
+  screen.appendChild(renderScreenHeader('Game setup'));
   screen.appendChild(el('p', { class: 'muted' }, `Mode: ${cap(mode)}`));
 
   // If user is signed in, default names are from their roster; else prompt
@@ -2998,7 +3003,7 @@ function renderOnline(router) {
 /* ----- Stats screen (per-player stats grouped by scope) ----- */
 async function renderStatsScreen(router) {
   const screen = el('section', { class: 'screen active' });
-  screen.appendChild(el('h2', {}, 'Stats'));
+  screen.appendChild(renderScreenHeader('Stats'));
 
   const history = getGameHistory();
   const players = listPlayers(history);

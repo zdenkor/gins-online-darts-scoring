@@ -121,6 +121,77 @@ export function showModal({ title = '', body = '', actions = [] } = {}) {
   return closeModal;
 }
 
+// =================================================================
+// Fullscreen button — used in the header of every top-level screen
+// (menu, setup, settings, stats). The game screen has its own
+// fullscreen button inside the game-toolbar, so it does NOT use
+// this helper.
+//
+// The button is an inline-SVG icon (Font Awesome 6 Free `expand` /
+// `compress`, CC BY 4.0). The icon switches based on the current
+// fullscreen state so the user can see the action at a glance.
+// The global `fullscreenchange` listener (attached once at the
+// bottom of this file) walks every `.fullscreen-icon-btn` and
+// updates its SVG, so every button on the page stays in sync
+// regardless of which screen mounted it.
+// =================================================================
+const EXPAND_SVG = '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 448 512" fill="currentColor"><path d="M32 32C14.3 32 0 46.3 0 64l0 96c0 17.7 14.3 32 32 32s32-14.3 32-32l0-64 64 0c17.7 0 32-14.3 32-32s-14.3-32-32-32L32 32zM64 352c0-17.7-14.3-32-32-32s-32 14.3-32 32l0 96c0 17.7 14.3 32 32 32l96 0c17.7 0 32-14.3 32-32s-14.3-32-32-32l-64 0 0-64zM320 32c-17.7 0-32 14.3-32 32s14.3 32 32 32l64 0 0 64c0 17.7 14.3 32 32 32s32-14.3 32-32l0-96c0-17.7-14.3-32-32-32l-96 0zM448 352c0-17.7-14.3-32-32-32s-32 14.3-32 32l0 64-64 0c-17.7 0-32 14.3-32 32s14.3 32 32 32l96 0c17.7 0 32-14.3 32-32l0-96z"/></svg>';
+const COMPRESS_SVG = '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 448 512" fill="currentColor"><path d="M160 64c0-17.7-14.3-32-32-32s-32 14.3-32 32l0 64-64 0c-17.7 0-32 14.3-32 32s14.3 32 32 32l96 0c17.7 0 32-14.3 32-32l0-96zM32 320c-17.7 0-32 14.3-32 32s14.3 32 32 32l64 0 0 64c0 17.7 14.3 32 32 32s32-14.3 32-32l0-96c0-17.7-14.3-32-32-32l-96 0zM352 64c0-17.7-14.3-32-32-32s-32 14.3-32 32l0 96c0 17.7 14.3 32 32 32l96 0c17.7 0 32-14.3 32-32s-14.3-32-32-32l-64 0 0-64zM320 320c-17.7 0-32 14.3-32 32l0 96c0 17.7 14.3 32 32 32s32-14.3 32-32l0-64 64 0c17.7 0 32-14.3 32-32s-14.3-32-32-32l-96 0z"/></svg>';
+
+function toggleFullscreen() {
+  if (!document.fullscreenElement) {
+    document.documentElement.requestFullscreen?.().catch(() => {
+      // Silent fail — the button is still there for the user to retry.
+      // (Modal/screen contexts may already have their own toast.)
+    });
+  } else {
+    document.exitFullscreen?.().catch(() => {});
+  }
+}
+
+export function fullscreenButton() {
+  const btn = el('button', {
+    class: 'btn ghost icon-btn fullscreen-icon-btn',
+    title: 'Toggle full screen',
+    'aria-label': 'Toggle full screen',
+    type: 'button',
+    onclick: toggleFullscreen,
+  });
+  btn.innerHTML = EXPAND_SVG;
+  // Mark with the current state so the global fullscreenchange
+  // listener can flip the SVG without a second lookup.
+  btn.dataset.fsState = document.fullscreenElement ? 'on' : 'off';
+  return btn;
+}
+
+// Global listener: when the user enters/exits fullscreen via Esc
+// or a browser shortcut (not the button), update every fullscreen
+// button on the page. Attached once on module load.
+if (typeof document !== 'undefined') {
+  document.addEventListener('fullscreenchange', () => {
+    const on = !!document.fullscreenElement;
+    for (const b of document.querySelectorAll('.fullscreen-icon-btn')) {
+      b.innerHTML = on ? COMPRESS_SVG : EXPAND_SVG;
+      b.dataset.fsState = on ? 'on' : 'off';
+    }
+  });
+}
+
+// Header bar for a top-level screen. Renders the screen's h2
+// title on the left and a fullscreen button on the right. The
+// game screen keeps its own .game-toolbar (it already has a
+// fullscreen button + Exit button) and does NOT use this.
+//
+// All sizes in vh/em so the header scales with the viewport —
+// the rest of the app uses the same convention.
+export function renderScreenHeader(title) {
+  const fs = fullscreenButton();
+  return el('header', { class: 'screen-header' },
+    el('h2', { class: 'screen-header-title' }, title),
+    fs,
+  );
+}
+
 /**
  * Touch-button row with a Custom option at the end that reveals a
  * free-form number input. Use for fields like "Max darts per leg"
