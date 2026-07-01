@@ -1495,6 +1495,21 @@ footer.app-footer .version {
   color: var(--text);
   font-size: 1.15em;
 }
+/* The Zero button hosts an inline SVG instead of a text
+   glyph. The SVG's intrinsic width/height attributes are
+   stripped (the inline markup uses viewBox + preserveAspectRatio
+   only), so the icon sizes purely from the CSS below. The
+   icon fills 80% of the button frame on both axes — the
+   same proportion that the text-icon neighbours hit via
+   the JS fitFontToFrame() multiplier. stroke uses
+   currentColor so the icon picks up the .calc-action-zero
+   colour (var(--muted)). */
+.calc-action-btn.calc-action-svg svg {
+  width: 80%;
+  height: 80%;
+  display: block;
+  color: var(--muted);
+}
 
 .calc-hint {
   color: var(--muted);

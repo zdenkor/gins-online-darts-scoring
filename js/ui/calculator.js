@@ -73,9 +73,12 @@ const ACTION_ICONS = {
 };
 
 // SVG markup for the Zero button — two zeros side-by-side in
-// rounded squares. Inlined here so the icon is self-contained
-// and consistent with the surrounding text-icon buttons.
-const ZERO_SVG = '<svg viewBox="0 0 32 14" width="22" height="10" aria-hidden="true">'
+// rounded squares. Width/height are 80% (set via CSS on
+// .calc-action-svg svg) so the icon scales to fill the
+// button frame along with the text-icon neighbours; the
+// viewBox keeps the 32×14 aspect ratio stable across
+// viewports.
+const ZERO_SVG = '<svg viewBox="0 0 32 14" preserveAspectRatio="xMidYMid meet" aria-hidden="true">'
   + '<rect x="0"  y="0" width="14" height="14" rx="3" ry="3" fill="none" stroke="currentColor" stroke-width="1.5"/>'
   + '<circle cx="7" cy="7" r="3" fill="none" stroke="currentColor" stroke-width="1.5"/>'
   + '<rect x="18" y="0" width="14" height="14" rx="3" ry="3" fill="none" stroke="currentColor" stroke-width="1.5"/>'
@@ -165,20 +168,23 @@ export function renderCalculator({
     // 60% of the button without strain.
     //
     // The action-row icons (Undo, Redo, SetScore, Zero,
-    // MoreCmds) get a 0.8 (80%) multiplier so the icon glyphs
-    // fill the button visually instead of floating in the
-    // middle. The user wants the icons to "take 80% of the
-    // button's frame" so the row reads as a row of icon
-    // buttons rather than a row of undersized decorations.
+    // MoreCmds) use 1.0 (100%) — but the cap-height of the
+    // glyph is only ~70% of the font-size (the rest is
+    // ascender/descender space), so a multiplier of 1.0 makes
+    // the *visible* icon fill ~70% of the button. The user
+    // wants the icon glyphs to fill the button visually; 1.0
+    // hits the sweet spot where the cap-height ≈ the button
+    // height and the icon reads as "filling the frame" without
+    // overflowing the padding.
     // MoreCmds also gets an additional 1.15× boost because its
     // three-dot ellipsis (⋯) reads visually smaller than the
     // arrow characters (↶ ↷ ＝) and the double-zero SVG.
     let mult = 0.6;
     if (btn.classList && btn.classList.contains('calc-action-btn')) {
-      mult = 0.8;
+      mult = 1.0;
     }
     if (btn.classList && btn.classList.contains('calc-action-morecmds')) {
-      mult = 0.8 * 1.15;
+      mult = 1.0 * 1.15;
     }
     const target = Math.min(w, h) * mult;
     btn.style.fontSize = Math.round(target) + 'px';
