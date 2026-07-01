@@ -1736,8 +1736,14 @@ function openHistoryEdit(idx) {
 
   function commitTurnTotal(total) {
     if (game.winner != null) return;
-    // For 01: ignore 0 entries (player shouldn't commit a no-op)
-    if (total === 0 && game.type !== 'shanghai') return;
+    // For X01: allow total=0 (BUST / no score). The engine
+    // submitTurnTotal01() handles a 0 entry as a no-op turn (no
+    // score change, turn advances to the next player), which is
+    // exactly what a player "threw and missed" or "deliberately
+    // recorded 0" looks like. Previously this guard silently
+    // dropped 0 entries, which made the BUST / No-Score buttons
+    // and the new 00 quick-action do nothing in the calculator.
+    if (total == null) return;
     // Capture the thrower's pre-turn score as a primitive. We
     // need it for the checkout-attempt gate, and we need it
     // BEFORE the engine mutates `game.players[game.current].score`.

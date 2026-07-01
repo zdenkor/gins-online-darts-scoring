@@ -51,6 +51,7 @@ const FAST_SPLIT_INDEX = 4;
 // Undo      → ↶ (leftwards arrow, "undo last dart")
 // Redo      → ↷ (rightwards arrow, "redo last undone dart")
 // SetScore  → ＝ (equals, "set score to entered value")
+// Zero      → 00 SVG (two zeros in rounded squares, "BUST / no score")
 // MoreCmds  → ⋯ (horizontal ellipsis, "more commands")
 //
 // The Exit button (⏻) used to live in this row but was moved to
@@ -60,7 +61,9 @@ const FAST_SPLIT_INDEX = 4;
 // the other turn-level commands in this row. Keeping Undo here
 // also frees up toolbar space for the more screen-level
 // controls (Fullscreen, Exit). The Redo button sits right of
-// Undo as the symmetric counterpart.
+// Undo as the symmetric counterpart. Zero sits between
+// SetScore and MoreCmds as the "no score / BUST" quick
+// action: one tap commits a 0-point turn.
 // =================================================================
 const ACTION_ICONS = {
   Undo:     '\u21B6',
@@ -68,6 +71,16 @@ const ACTION_ICONS = {
   SetScore: '\uff1d',
   MoreCmds: '\u22ef',
 };
+
+// SVG markup for the Zero button — two zeros side-by-side in
+// rounded squares. Inlined here so the icon is self-contained
+// and consistent with the surrounding text-icon buttons.
+const ZERO_SVG = '<svg viewBox="0 0 32 14" width="22" height="10" aria-hidden="true">'
+  + '<rect x="0"  y="0" width="14" height="14" rx="3" ry="3" fill="none" stroke="currentColor" stroke-width="1.5"/>'
+  + '<circle cx="7" cy="7" r="3" fill="none" stroke="currentColor" stroke-width="1.5"/>'
+  + '<rect x="18" y="0" width="14" height="14" rx="3" ry="3" fill="none" stroke="currentColor" stroke-width="1.5"/>'
+  + '<circle cx="25" cy="7" r="3" fill="none" stroke="currentColor" stroke-width="1.5"/>'
+  + '</svg>';
 
 export function renderCalculator({
   onCommit,
@@ -89,21 +102,29 @@ export function renderCalculator({
   display.appendChild(entered);
   root.appendChild(display);
 
-  // Half-height action row: 4 icon-only buttons.
-  // (Undo, Redo, SetScore, MoreCmds). Each is a quarter the
-  // width of a numpad row (full width split 4 ways), half the
+  // Half-height action row: 5 icon-only buttons.
+  // (Undo, Redo, SetScore, Zero, MoreCmds). Each is a fifth
+  // the width of a numpad row (full width split 5 ways), half the
   // height. Undo sits in the leftmost position (the same slot
   // the old Exit button used to occupy) so its placement is
   // consistent with the per-turn command area. Redo is the
-  // immediate right of Undo.
+  // immediate right of Undo. Zero is the "BUST / no score"
+  // quick-action, sits between SetScore and MoreCmds.
   const actions = el('div', { class: 'calc-actions' });
-  for (const key of ['Undo', 'Redo', 'SetScore', 'MoreCmds']) {
+  for (const key of ['Undo', 'Redo', 'SetScore', 'Zero', 'MoreCmds']) {
+    const isSvg = key === 'Zero';
     const btn = el('button', {
-      class: 'calc-action-btn calc-action-' + key.toLowerCase(),
+      class: 'calc-action-btn calc-action-' + key.toLowerCase()
+        + (isSvg ? ' calc-action-svg' : ''),
       'aria-label': ariaLabelFor(key),
       title: ariaLabelFor(key),
       onclick: () => handleAction(key),
-    }, ACTION_ICONS[key]);
+    });
+    if (isSvg) {
+      btn.innerHTML = ZERO_SVG;
+    } else {
+      btn.textContent = ACTION_ICONS[key];
+    }
     actions.appendChild(btn);
   }
   root.appendChild(actions);
@@ -260,6 +281,16 @@ export function renderCalculator({
         if (!Number.isFinite(v)) return;
         if (onSetScore) onSetScore(v);
         break;
+      case 'Zero':
+        // BUST / no-score quick action: commit a 0-point turn
+        // directly, bypassing the entered buffer. The engine
+        // treats total=0 as a no-op turn (no score change, turn
+        // advances), which is the right behaviour for "I
+        // threw and missed" or "I deliberately recorded 0".
+        if (onCommit) onCommit(0);
+        buffer = '0';
+        refresh();
+        break;
       case 'MoreCmds':
         if (onMoreCommands) onMoreCommands();
         break;
@@ -308,6 +339,7 @@ function ariaLabelFor(key) {
     case 'Undo':     return 'Undo last dart';
     case 'Redo':     return 'Redo last undone dart';
     case 'SetScore': return 'Set score to entered value';
+    case 'Zero':     return 'BUST / no score (commit 0)';
     case 'MoreCmds': return 'More commands';
     default:         return key;
   }
