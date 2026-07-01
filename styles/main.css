@@ -1448,23 +1448,27 @@ footer.app-footer .version {
    calc width equally. */
 .calc-actions {
   display: grid;
-  grid-template-columns: 1fr 1fr 1fr 1fr;
-  gap: clamp(6px, 1.5vw, 10px);
+  grid-template-columns: 1fr 1fr 1fr 1fr 1fr;
+  gap: clamp(4px, 1vw, 8px);
   width: 100%;
   /* Sits between the display and the numpad. The numpad's grid
      has 4 equal rows, so the action row is sized to roughly half
-     a numpad row. */
+     a numpad row. nowrap-equivalent: 5 buttons always stay on
+     one row, even on narrow phones. The gap shrinks down to
+     4px on small viewports so the five columns still fit. */
   flex: 0 0 auto;
 }
 .calc-action-btn {
   flex: 1; background: #232c3d; border: 1px solid #34405a; color: var(--text);
   border-radius: 10px; display: flex; align-items: center; justify-content: center;
   /* Font scales with viewport height (vh) for a predictable
-     percentage-of-frame feel. */
-  font-size: clamp(16px, 4.2vh, 28px); font-weight: 700; line-height: 1;
+     percentage-of-frame feel. Sized at ~80% of the previous
+     default so the five action icons fit on one row even on
+     narrow phones without wrapping. */
+  font-size: clamp(13px, 3.4vh, 22px); font-weight: 700; line-height: 1;
   user-select: none; -webkit-tap-highlight-color: transparent;
   min-height: 48px;
-  padding: 8px 4px;
+  padding: 8px 2px;
   transition: background .12s ease, transform .06s ease;
 }
 .calc-action-btn:hover { background: #2c374f; }
@@ -1474,17 +1478,19 @@ footer.app-footer .version {
      undo     — neutral (text color, no special emphasis)
      redo     — neutral (text color, no special emphasis)
      setscore — accent (green, "confirmative" action)
+     zero     — muted (no special emphasis, BUST / no-score)
      morecmds — text (no emphasis, opens a submenu)
    The old `calc-action-exit` rule was for the calc's now-removed
    Exit button (moved to the toolbar); Undo took its place.
    `morecmds` is also slightly larger (1.15em font) than the
-   other three because the three-dot ellipsis is the most
+   other buttons because the three-dot ellipsis is the most
    space-efficient glyph in the row and reads smaller visually
-   than the arrow characters. Boosting its size keeps the four
+   than the arrow characters. Boosting its size keeps the five
    buttons feeling equally prominent on small viewports. */
 .calc-action-btn.calc-action-undo    { color: var(--text); }
 .calc-action-btn.calc-action-redo    { color: var(--text); }
 .calc-action-btn.calc-action-setscore{ color: var(--accent); }
+.calc-action-btn.calc-action-zero    { color: var(--muted); }
 .calc-action-btn.calc-action-morecmds{
   color: var(--text);
   font-size: 1.15em;
