@@ -570,33 +570,6 @@ select.input option, select.dropdown-readable option {
 
 /* ---------- Menu ---------- */
 .menu { display: grid; gap: 14px; }
-/* Screen header bar — title on the left, fullscreen button on
-   the right. Used by menu / setup / settings / stats. The game
-   screen has its own .game-toolbar (fullscreen + Exit) and does
-   NOT use this. All sizes vh/em so they scale with viewport. */
-.screen-header {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: 2vh;
-  margin: 1.5vh 0 1vh;
-  flex-wrap: nowrap;
-}
-.screen-header-title {
-  margin: 0;
-  font-size: 3.6vh;
-  font-weight: 600;
-  line-height: 1.2;
-  flex: 1 1 auto;
-  min-width: 0;          /* allow truncation on narrow viewports */
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-}
-.screen-header .fullscreen-icon-btn {
-  flex: 0 0 auto;
-  font-size: 1em;        /* keep the same scale as other icon-btns */
-}
 .menu h2 { margin: 8px 0 0; font-size: 22px; }
 .menu .lede { color: var(--muted); margin: 0 0 10px; }
 .card {

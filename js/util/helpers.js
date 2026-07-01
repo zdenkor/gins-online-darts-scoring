@@ -177,21 +177,6 @@ if (typeof document !== 'undefined') {
   });
 }
 
-// Header bar for a top-level screen. Renders the screen's h2
-// title on the left and a fullscreen button on the right. The
-// game screen keeps its own .game-toolbar (it already has a
-// fullscreen button + Exit button) and does NOT use this.
-//
-// All sizes in vh/em so the header scales with the viewport —
-// the rest of the app uses the same convention.
-export function renderScreenHeader(title) {
-  const fs = fullscreenButton();
-  return el('header', { class: 'screen-header' },
-    el('h2', { class: 'screen-header-title' }, title),
-    fs,
-  );
-}
-
 /**
  * Touch-button row with a Custom option at the end that reveals a
  * free-form number input. Use for fields like "Max darts per leg"
