@@ -427,10 +427,14 @@ export function x01GameOptionsControls({ state, helpVisible, X01_IN_OPTIONS, X01
   const inOptions = Object.entries(X01_IN_OPTIONS)
     .filter(([value]) => value !== 'single')
     .map(([value, { label }]) => ({ value, label }));
+  const inHelpEl = el('div', { class: 'small' });
+  inHelpEl.appendChild(el('p', { style: 'margin: 0 0 4px;' }, 'In rule — what dart must land to start scoring:'));
+  inHelpEl.appendChild(el('p', { style: 'margin: 0 0 4px;' }, '• DI = Double In — a double segment (D1..D20, D-Bull) opens scoring.'));
+  inHelpEl.appendChild(el('p', { style: 'margin: 0 0 4px;' }, '• TI = Triple In — a triple segment (T1..T20) opens scoring.'));
+  inHelpEl.appendChild(el('p', { style: 'margin: 0 0 4px;' }, '• MI = Master In — a double or bull opens scoring.'));
+  inHelpEl.appendChild(el('p', { style: 'margin: 0 0 4px; color: var(--muted);' }, 'SI (Single In) is the default if nothing is selected — any dart opens scoring. (Hidden from the picker; legacy saved games still work.)'));
   const inRow = toggleRow(
-    labelWithHelp('In', 'In rule',
-      'DI/TI/MI = double/triple/master required to start scoring. Tap again to turn off. (SI is the default if nothing is selected.)',
-      helpVisible),
+    labelWithHelp('In', 'In rule', inHelpEl, helpVisible),
     inOptions,
     state.in,
     v => { state.in = v; });
@@ -438,10 +442,14 @@ export function x01GameOptionsControls({ state, helpVisible, X01_IN_OPTIONS, X01
   const outOptions = Object.entries(X01_OUT_OPTIONS)
     .filter(([value]) => value !== 'single')
     .map(([value, { label }]) => ({ value, label }));
+  const outHelpEl = el('div', { class: 'small' });
+  outHelpEl.appendChild(el('p', { style: 'margin: 0 0 4px;' }, 'Out rule — what dart must land to finish (reach 0):'));
+  outHelpEl.appendChild(el('p', { style: 'margin: 0 0 4px;' }, '• DO = Double Out — finish on a double (D1..D20, D-Bull). Standard x01 rule.'));
+  outHelpEl.appendChild(el('p', { style: 'margin: 0 0 4px;' }, '• TO = Triple Out — finish on a triple (T1..T20) or D-Bull.'));
+  outHelpEl.appendChild(el('p', { style: 'margin: 0 0 4px;' }, '• MO = Master Out — finish on a double, triple, or D-Bull (any non-single except S-Bull).'));
+  outHelpEl.appendChild(el('p', { style: 'margin: 0 0 4px; color: var(--muted);' }, 'SO (Single Out) is the default if nothing is selected — any dart can finish. (Hidden from the picker; DO is pre-selected as the standard x01 default.)'));
   const outRow = toggleRow(
-    labelWithHelp('Out', 'Out rule',
-      'DO/TO/MO = double/triple/master required to finish. Tap again to turn off. (SO is the default if nothing is selected, but DO is pre-selected as the standard x01 default.)',
-      helpVisible),
+    labelWithHelp('Out', 'Out rule', outHelpEl, helpVisible),
     outOptions,
     state.out,
     v => { state.out = v; });
@@ -476,9 +484,10 @@ export function x01GameOptionsControls({ state, helpVisible, X01_IN_OPTIONS, X01
   // Max darts per leg
   const capRow = capButtonRow({
     label: labelWithHelp('Max darts per leg', 'Max darts per leg',
-      'Limit how many darts each player may throw in one leg. 0 means no limit. Useful for speed variants.',
+      'Limit how many darts each player may throw in one leg. 0 means no limit (infinite darts). Useful for speed variants — set a low cap (e.g. 21) to force a fast finish.',
       helpVisible),
     presets: [
+      { value: 0,  label: '0 (∞)' },
       { value: 21, label: '21' },
       { value: 36, label: '36' },
       { value: 45, label: '45' },
