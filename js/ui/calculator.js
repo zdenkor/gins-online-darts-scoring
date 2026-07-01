@@ -159,15 +159,26 @@ export function renderCalculator({
     const w = btn.offsetWidth;
     const h = btn.offsetHeight;
     if (!w || !h) return; // hidden / not yet laid out
-    // Per-button font-size multiplier. Most buttons use 0.6 (60%
-    // of nearest frame border), but the MoreCmds button gets a
-    // 1.15× boost because its three-dot ellipsis (⋯) reads
-    // visually smaller than the arrow characters used for the
-    // other action buttons (↶ ↷ ＝). Without the boost the dots
-    // look under-prominent on small viewports like 600×800.
+    // Per-button font-size multiplier. The numpad and fast-score
+    // buttons use 0.6 (60% of nearest frame border) — the
+    // numbers are small glyphs and the user can read them at
+    // 60% of the button without strain.
+    //
+    // The action-row icons (Undo, Redo, SetScore, Zero,
+    // MoreCmds) get a 0.8 (80%) multiplier so the icon glyphs
+    // fill the button visually instead of floating in the
+    // middle. The user wants the icons to "take 80% of the
+    // button's frame" so the row reads as a row of icon
+    // buttons rather than a row of undersized decorations.
+    // MoreCmds also gets an additional 1.15× boost because its
+    // three-dot ellipsis (⋯) reads visually smaller than the
+    // arrow characters (↶ ↷ ＝) and the double-zero SVG.
     let mult = 0.6;
+    if (btn.classList && btn.classList.contains('calc-action-btn')) {
+      mult = 0.8;
+    }
     if (btn.classList && btn.classList.contains('calc-action-morecmds')) {
-      mult = 0.6 * 1.15;
+      mult = 0.8 * 1.15;
     }
     const target = Math.min(w, h) * mult;
     btn.style.fontSize = Math.round(target) + 'px';
