@@ -532,6 +532,27 @@ main { flex: 1; padding: 16px; width: 100%; margin: 0 auto;
   font-weight: 600;
   box-shadow: 0 0 0 1px rgba(44,212,154,0.4) inset;
 }
+/* Disabled segmented button — used by the checkout-attempts
+   modal to grey-out impossible dart counts (e.g. "1" for a
+   DO target of 81, since 81 is a 2-dart finish). The button
+   stays in the layout so the user sees the full range, but
+   it can't be tapped and gets a `not-allowed` cursor. Opacity
+   and color use no exact px — they're em-relative. */
+.btn.segmented-disabled,
+.btn.segmented-btn[disabled] {
+  opacity: 0.4;
+  cursor: not-allowed;
+  background: var(--bg-2) !important;
+  color: var(--muted) !important;
+  border-color: var(--line) !important;
+  box-shadow: none !important;
+  font-weight: 400 !important;
+}
+.btn.segmented-disabled:hover,
+.btn.segmented-btn[disabled]:hover {
+  background: var(--bg-2) !important;
+  border-color: var(--line) !important;
+}
 .field.button-row-field {
   /* Default layout: label on its own line (`display: block` on
      the label), button group below. This is the standard

@@ -1966,9 +1966,8 @@ function openHistoryEdit(idx) {
   // close-out. The question appears in a modal so it can't be missed
   // but doesn't block the scoreboard update. The user enters 0 for
   // a bust (didn't successfully close), or 1-3 for the darts that
-  // landed on the close-out combination (which is also 0 for a bust
-  // that hit a non-zero score). Setting `Checkout Statistic` to Off
-  // (Settings → Statistics) skips the prompt entirely.
+  // landed on the close-out combination. Setting `Checkout Statistic`
+  // to Off (Settings → Statistics) skips the prompt entirely.
   function maybeAskCheckoutAttempts(throwerName, target, meta) {
     if (!loadUiStatsSettings().checkoutStats) return;
     // Compute the index of the entry we just pushed (the last one
@@ -1984,35 +1983,67 @@ function openHistoryEdit(idx) {
       : meta.bust ? 'busted'
       : `left ${(target != null) ? target - (entry.total || 0) : '?'} (still in)`;
     // Short summary line — who/where/result. The longer
-    // explanation ("how to answer this modal") lives in the
-    // help icon (ⓘ) next to the title; tapping ⓘ opens it in a
-    // modal. The visibility of the ⓘ honours the
-    // Settings → Help icons preference.
+    // explanation ("how to answer this modal", "why are some
+    // buttons disabled?") lives in the help icon (ⓘ) next to
+    // the title; tapping ⓘ opens it in a modal. The visibility
+    // of the ⓘ honours the Settings → Help icons preference.
     const helpVisible = isHelpEnabled();
-    const helpText = 'Tap the number of darts you aimed at the checkout. '
-      + '0 = bust (you didn\'t check out). 1, 2 or 3 = darts aimed — even if you missed. '
-      + 'The default is 0 on a bust, or your full dart count on a regular throw (you probably used all your darts at the close-out). '
-      + 'Use Skip to dismiss without recording.';
+    // Compute the smallest dart count that CAN finish the
+    // pre-turn target under the active out rule. Buttons
+    // labelled with counts BELOW this are disabled (e.g. on
+    // DO target 81 is a 2-dart finish — T19+D12 — so the "1"
+    // button is impossible and gets the `disabled` attribute).
+    // On a leg-win the target is 0, which isClosableX01()
+    // returns false for; we treat that as "all counts OK" (the
+    // user just closed out, they used 1, 2 or 3 darts and we
+    // don't know which — they have to tell us).
+    const inOut = { in: game.opts?.in || 'single', out: game.opts?.out || 'single' };
+    let minDarts = 1;
+    if (meta.isLegWin) {
+      minDarts = 1;
+    } else if (target != null && target > 0) {
+      minDarts = 4; // unreachable until we find a closable budget
+      for (let n = 1; n <= 3; n++) {
+        if (isClosableX01(target, inOut, n)) { minDarts = n; break; }
+      }
+      if (minDarts === 4) minDarts = 1; // safety: shouldn't happen (gate 2 already filtered)
+    }
+    const minDartsLabel = minDarts === 1 ? '1 dart'
+      : minDarts === 2 ? '2 darts'
+      : '3 darts';
+    const helpText = `Tap the number of darts you aimed at the checkout. `
+      + `0 = bust (you didn't check out). 1, 2 or 3 = darts aimed at the close-out — even if you missed. `
+      + `The target (${target}) is closable in ${minDartsLabel} on the active out rule, so buttons below ${minDarts} are disabled — a 1-dart finish on 81 isn't physically possible on Double Out (81 = T19+D12, that's 2 darts). `
+      + `The default is 0 on a bust, or your full dart count on a regular throw (you probably used all your darts at the close-out). `
+      + `Use Skip to dismiss without recording.`;
     body.appendChild(el('p', { class: 'muted', style: 'margin-top: 0;' },
       `${throwerName} was on ${target} and ${outcome}.`));
     // 4-button segmented control: 0 / 1 / 2 / 3. Touch-friendly —
     // each button is a tappable target, no numeric keyboard needed.
     // Default to 0 on bust, or to meta.darts (1-3) on a regular
     // throw (the player probably used all their darts aiming at
-    // the checkout).
-    const defaultDarts = meta.bust ? 0 : Math.max(1, Math.min(3, meta.darts || 1));
+    // the checkout). Buttons for impossible dart counts (under
+    // minDarts) are disabled — visible but not tappable.
+    const defaultDarts = meta.bust ? 0 : Math.max(minDarts, Math.min(3, meta.darts || minDarts));
     let selected = defaultDarts;
     // Wrap the row in a class so the CSS can bump its size
     // (vh-based for viewport-relative scaling, em for proportional).
     const btnRow = el('div', { class: 'btn-row segmented checkout-dart-row' });
     const buttons = {};
     [0, 1, 2, 3].forEach((n) => {
+      const isImpossible = n > 0 && n < minDarts;
       const b = el('button', {
         type: 'button',
-        class: 'btn segmented-btn' + (n === selected ? ' segmented-selected' : ''),
+        class: 'btn segmented-btn'
+          + (n === selected ? ' segmented-selected' : '')
+          + (isImpossible ? ' segmented-disabled' : ''),
         'data-value': String(n),
+        ...(isImpossible ? { disabled: true,
+          title: `Can't close ${target} in ${n} dart${n === 1 ? '' : 's'} on the active out rule.`,
+        } : {}),
       }, String(n));
       b.addEventListener('click', () => {
+        if (b.disabled) return;
         selected = n;
         Object.values(buttons).forEach(x => x.classList.remove('segmented-selected'));
         b.classList.add('segmented-selected');
