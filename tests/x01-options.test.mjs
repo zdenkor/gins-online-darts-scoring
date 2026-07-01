@@ -3,7 +3,7 @@ import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import {
   new01, throwDarts01, submitTurnTotal01,
-  resolveBullThrow, checkoutSuggestions, CHECKOUT_170,
+  resolveBullThrow, checkoutSuggestions, isClosableX01, CHECKOUT_170,
   MAX_TURN_TOTAL,
 } from '../js/game/engine.js';
 
@@ -146,6 +146,188 @@ test('170: checkout for 40 in 1 dart = D20', () => {
 
 test('MAX_TURN_TOTAL is 180', () => {
   assert.equal(MAX_TURN_TOTAL, 180);
+});
+
+/* ---------- isClosableX01 (closability gate for checkout-stat prompt) ---------- */
+test('isClosableX01: classic DO unclosables (1, 159, 162, 163, 165, 166, 168, 169)', () => {
+  for (const t of [1, 159, 162, 163, 165, 166, 168, 169]) {
+    assert.equal(isClosableX01(t, { in: 'single', out: 'double' }, 3), false,
+      `target=${t} should be unclosable on DO`);
+  }
+});
+test('isClosableX01: classic DO closables (40, 50, 120, 170)', () => {
+  for (const t of [40, 50, 60, 100, 120, 170]) {
+    assert.equal(isClosableX01(t, { in: 'single', out: 'double' }, 3), true,
+      `target=${t} should be closable on DO`);
+  }
+});
+test('isClosableX01: MO unclosables include 1 + the same high-end set as DO', () => {
+  for (const t of [1, 159, 162, 163, 165, 166, 168, 169]) {
+    assert.equal(isClosableX01(t, { in: 'single', out: 'master' }, 3), false,
+      `target=${t} should be unclosable on MO`);
+  }
+  assert.equal(isClosableX01(50, { in: 'single', out: 'master' }, 3), true); // BULL
+  assert.equal(isClosableX01(170, { in: 'single', out: 'master' }, 3), true); // T20+T20+BULL
+});
+test('isClosableX01: TO unclosables include 1, 2 (smallest triple is T1=3)', () => {
+  for (const t of [1, 2]) {
+    assert.equal(isClosableX01(t, { in: 'single', out: 'triple' }, 3), false,
+      `target=${t} should be unclosable on TO`);
+  }
+  for (const t of [3, 6, 30, 60, 180]) {
+    assert.equal(isClosableX01(t, { in: 'single', out: 'triple' }, 3), true,
+      `target=${t} should be closable on TO`);
+  }
+});
+test('isClosableX01: SO has 9 unclosable numbers > 160 (max 3-dart total is 180)', () => {
+  for (const t of [1, 2, 40, 50, 100, 120, 170, 180]) {
+    assert.equal(isClosableX01(t, { in: 'single', out: 'single' }, 3), true,
+      `target=${t} should be closable on SO`);
+  }
+  // SO unclosable: 163, 166, 169, 172, 173, 175, 176, 178, 179
+  for (const t of [163, 166, 169, 172, 173, 175, 176, 178, 179]) {
+    assert.equal(isClosableX01(t, { in: 'single', out: 'single' }, 3), false,
+      `target=${t} should be unclosable on SO (max 3-dart total is 180)`);
+  }
+});
+test('isClosableX01: 0 and > 180 always unclosable', () => {
+  assert.equal(isClosableX01(0, { in: 'single', out: 'double' }, 3), false);
+  assert.equal(isClosableX01(181, { in: 'single', out: 'double' }, 3), false);
+  assert.equal(isClosableX01(500, { in: 'single', out: 'double' }, 3), false);
+});
+test('isClosableX01: boolean shorthand (true = DO, false = SO)', () => {
+  assert.equal(isClosableX01(169, true, 3), false);  // 169 unclosable on DO
+  assert.equal(isClosableX01(170, true, 3), true);   // 170 closable on DO
+  assert.equal(isClosableX01(169, false, 3), false); // 169 also unclosable on SO
+  assert.equal(isClosableX01(40, false, 3), true);   // 40 closable on SO
+});
+
+/* ---------- checkout-attempt gate logic (total-entry mode) ----------
+   The UI's shouldAskCheckout() gate uses two isClosableX01() calls:
+     gate 2: isClosableX01(target, out, 3)   — pre-turn target was closable
+     gate 3: isClosableX01(remaining, out, 1) — post-turn remaining was a
+              1-dart finish (the only signal in total-entry mode that the
+              player was actually aiming at the close-out)
+   These tests verify the boolean combinations the user expects. */
+test('checkout gate: DO 101 throw 1 → remaining 100 → NOT a checkout (100 needs 2 darts)', () => {
+  const target = 101, total = 1, out = 'double';
+  // Gate 2: pre-turn 101 is closable on DO in 3 darts
+  assert.equal(isClosableX01(target, { in: 'single', out }, 3), true,
+    'pre-turn 101 should be DO-closable');
+  // Gate 3: remaining 100 is NOT 1-dart closable on DO (it's T20+BULL = 2 darts)
+  const remaining = target - total;
+  assert.equal(isClosableX01(remaining, { in: 'single', out }, 1), false,
+    'remaining 100 should NOT be 1-dart DO-closable');
+});
+test('checkout gate: DO 101 throw 81 → remaining 20 → IS a checkout (20 = D10)', () => {
+  const target = 101, total = 81, out = 'double';
+  assert.equal(isClosableX01(target, { in: 'single', out }, 3), true);
+  const remaining = target - total;
+  assert.equal(isClosableX01(remaining, { in: 'single', out }, 1), true,
+    'remaining 20 should be 1-dart DO-closable (D10)');
+});
+test('checkout gate: DO 101 throw 41 → remaining 60 → NOT a checkout (60 unclosable on DO)', () => {
+  const target = 101, total = 41, out = 'double';
+  assert.equal(isClosableX01(target, { in: 'single', out }, 3), true);
+  const remaining = target - total;
+  assert.equal(isClosableX01(remaining, { in: 'single', out }, 1), false,
+    'remaining 60 should NOT be 1-dart DO-closable (60 is unclosable on DO)');
+});
+test('checkout gate: DO 100 throw 60 → remaining 40 → IS a checkout (40 = D20)', () => {
+  const target = 100, total = 60, out = 'double';
+  assert.equal(isClosableX01(target, { in: 'single', out }, 3), true);
+  const remaining = target - total;
+  assert.equal(isClosableX01(remaining, { in: 'single', out }, 1), true,
+    'remaining 40 should be 1-dart DO-closable (D20)');
+});
+test('checkout gate: DO 50 throw 50 → remaining 0 (leg-win) → IS a checkout', () => {
+  const target = 50, total = 50, out = 'double';
+  assert.equal(isClosableX01(target, { in: 'single', out }, 3), true);
+  const remaining = target - total; // 0 — leg-win, always count
+  assert.equal(remaining, 0);
+});
+test('checkout gate: DO 30 throw 35 → bust, remaining 30 (1-dart D15) → IS a checkout', () => {
+  const target = 30, total = 35, out = 'double';
+  assert.equal(isClosableX01(target, { in: 'single', out }, 3), true);
+  // On a bust, remaining = target (unchanged)
+  const remaining = target; // bust reverts
+  assert.equal(isClosableX01(remaining, { in: 'single', out }, 1), true,
+    'remaining 30 should be 1-dart DO-closable (D15)');
+});
+
+/* ---------- Alex/221 regression test ----------
+   Reported bug: "Alex was on 221 (unclosable on DO), threw 85, the
+   system asked for number of darts". Root cause: the pre-turn
+   target was read from `game.players[game.current]?.score` AFTER
+   the engine had already mutated it (and advanced to the next
+   thrower). The fix captures the thrower's player entry BEFORE
+   the engine runs.
+
+   This test asserts the gate logic on the pre-turn target — the
+   integration test in the UI (the actual modal firing or not)
+   is harder to test without a full DOM. We verify the helper
+   would block the modal for the 221 case. */
+test('checkout gate: DO 221 (Alex regression) → pre-turn unclosable → NO modal', () => {
+  // Alex was on 221 DO (unclosable in 3 darts on DO)
+  const target = 221, out = 'double';
+  assert.equal(isClosableX01(target, { in: 'single', out }, 3), false,
+    '221 should be unclosable on DO (max 3-dart total is 180)');
+  // The post-turn remaining 136 IS 3-dart closable on DO, but
+  // the pre-turn target was NOT — the modal must not fire.
+  const remaining = 136;
+  assert.equal(isClosableX01(remaining, { in: 'single', out }, 3), true,
+    'sanity: 136 is 3-dart DO-closable — but this is the POST-turn score, not the pre-turn target');
+  // The gate uses the pre-turn target (221), which fails.
+  const gateResult = isClosableX01(target, { in: 'single', out }, 3);
+  assert.equal(gateResult, false, 'gate 2 should fail on pre-turn 221');
+});
+
+/* ---------- Alex/221 end-to-end regression test ----------
+   The full flow: Alex on 221 DO throws 100, leaves 121. Both
+   gate 2 (pre-turn 221 unclosable) AND gate 3 (post-turn 121
+   not 1-dart closable) must block the modal. The previous fix
+   captured a REFERENCE to the player object — which got
+   mutated by the engine — so checkoutTarget silently read
+   the POST-turn score (121) instead of 221. The current fix
+   captures the score as a PRIMITIVE before the engine runs. */
+test('checkout gate end-to-end: Alex 221 → 100 → 121 on DO → NO modal', () => {
+  const g = new01(['Alex', 'Bob'], { start: 221, out: 'double' });
+  // Capture the pre-turn score as a PRIMITIVE (not a player
+  // reference) BEFORE calling submitTurnTotal01. This mirrors
+  // the real commitTurnTotal flow in screens.js.
+  const preTurnScore = g.players[g.current].score;
+  submitTurnTotal01(g, 100);
+  // Sanity: engine advanced current to Bob and set Alex's score to 121
+  assert.equal(g.players[0].score, 121, 'Alex post-turn score should be 121');
+  assert.equal(g.current, 1, 'current should advance to Bob');
+  // The captured preTurnScore must still be 221 (primitive,
+  // unaffected by the engine mutation).
+  assert.equal(preTurnScore, 221, 'preTurnScore must remain 221 after engine mutation');
+  // Gate 2: pre-turn 221 unclosable on DO
+  assert.equal(isClosableX01(preTurnScore, { in: 'single', out: 'double' }, 3), false,
+    'gate 2 should fail on pre-turn 221');
+  // Gate 3 (post-turn remaining 121): not 1-dart closable on DO
+  assert.equal(isClosableX01(121, { in: 'single', out: 'double' }, 1), false,
+    'gate 3 should fail: 121 is not 1-dart DO-closable');
+  // Both gates block the modal. The modal must NOT fire.
+});
+
+/* ---------- isClosableX01 budget dimension ---------- */
+test('isClosableX01: budget=1 vs budget=3 — different unclosable sets', () => {
+  // 100 is 2-dart (T20+BULL) on DO, not 1-dart
+  assert.equal(isClosableX01(100, { in: 'single', out: 'double' }, 1), false,
+    '100 should NOT be 1-dart DO-closable');
+  assert.equal(isClosableX01(100, { in: 'single', out: 'double' }, 2), true,
+    '100 should be 2-dart DO-closable (T20+BULL)');
+  // 40 is 1-dart (D20) on DO
+  assert.equal(isClosableX01(40, { in: 'single', out: 'double' }, 1), true);
+  // 60 is 2-dart (D5 + D25) on DO
+  assert.equal(isClosableX01(60, { in: 'single', out: 'double' }, 1), false,
+    '60 should NOT be 1-dart DO-closable (it is 2-dart: D5 + D25)');
+  assert.equal(isClosableX01(60, { in: 'single', out: 'double' }, 2), true,
+    '60 should be 2-dart DO-closable');
+  // 50 is 1-dart (BULL) on DO
+  assert.equal(isClosableX01(50, { in: 'single', out: 'double' }, 1), true);
 });
 
 /* ---------- legs-per-set presets (e.g. 2 legs per set) ---------- */

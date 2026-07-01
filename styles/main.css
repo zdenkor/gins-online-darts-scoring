@@ -1856,6 +1856,36 @@ footer.app-footer .version {
 .cmd-row .cmd-label { font-size: clamp(21px, 2.9vw, 24px); font-weight: 600; }
 .cmd-row .cmd-desc  { font-size: clamp(15px, 2.1vw, 18px); color: var(--muted); margin-top: 4px; }
 
+/* Checkout-attempts modal — touch-display-friendly sizing.
+   The modal is the only one that needs four large radio-style
+   buttons (0/1/2/3) for dart counts, so the default modal
+   button size (15px / 48px min) reads as too small on a phone.
+   All sizes are responsive: vh for the dart buttons (frame-
+   relative to the viewport), em for the action row (proportional
+   to the modal's base font). Title and body line get a vh bump
+   too so the question reads clearly on touch displays. */
+.checkout-modal-title { font-size: 3.6vh; }
+.checkout-modal-title + p { font-size: 2.6vh; line-height: 1.4; }
+.checkout-dart-row { margin-top: 2vh; gap: 1.2vh; }
+.checkout-dart-row .btn.segmented-btn {
+  /* ~6vh button height, big readable digits, no exact px.
+     vh makes the buttons scale with viewport height so they
+     stay touch-friendly on phones and tablets. */
+  min-height: 6vh;
+  font-size: 3.6vh;
+  font-weight: 600;
+  padding: 1vh 0.6em;
+  flex: 1 1 0;
+}
+.modal-panel:has(.checkout-dart-row) .modal-actions .btn {
+  /* Bump the Skip / Save buttons when the modal is the
+     checkout-attempts one. Uses em so it scales with the
+     modal's base font; min-height is vh for the touch target. */
+  font-size: 1.4em;
+  min-height: 5.5vh;
+  padding: 1.2vh 1.2em;
+}
+
 .stats-panel { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
 .stats-card  {
   background: var(--bg-2); border: 1px solid var(--line);

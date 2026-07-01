@@ -12,7 +12,7 @@ import {
   throwDarts01, throwDartsCricket, throwDartsShanghai,
   submitTurnTotal01, submitTurnTotalShanghai, submitTurnCricketMarks,
   dartValue, dartLabel, MAX_DARTS_PER_TURN, MAX_TURN_TOTAL,
-  checkoutSuggestions, CHECKOUT_170,
+  checkoutSuggestions, isClosableX01, CHECKOUT_170,
   X01_IN_OPTIONS, X01_OUT_OPTIONS,
   editRawDart,
 } from '../game/engine.js';
@@ -1761,10 +1761,24 @@ function openHistoryEdit(idx) {
     if (game.winner != null) return;
     // For 01: ignore 0 entries (player shouldn't commit a no-op)
     if (total === 0 && game.type !== 'shanghai') return;
-    // Capture the thrower's name BEFORE submitTurnTotal01 advances
-    // `game.current` to the next player — otherwise the entry's `by`
-    // field would point at the next thrower, not the one who just threw.
+    // Capture the thrower's pre-turn score as a primitive. We
+    // need it for the checkout-attempt gate, and we need it
+    // BEFORE the engine mutates `game.players[game.current].score`.
+    //
+    // Critically, we must NOT keep a reference to the player
+    // object itself (`const throwerEntryBefore = game.players[game.current]`)
+    // because that object is shared with the engine — once
+    // submitTurnTotal01 mutates `player.score`, our reference
+    // also reflects the post-turn value. The previous fix made
+    // this mistake: it captured the player object and read
+    // `.score` later, which silently returned the POST-turn
+    // score. The Alex/221 regression happened because of this:
+    // the modal fired for "I was on 121, left 21, how many
+    // darts" — but Alex was actually on 221 going in.
     const throwerName = game.players[game.current]?.name;
+    const preTurnScore = (game.players[game.current]?.score != null)
+      ? game.players[game.current].score
+      : null;
 
     // History-edit branch: overwrite the existing entry at
     // `editingHistoryEntry.idx` instead of appending a new turn.
@@ -1800,20 +1814,18 @@ function openHistoryEdit(idx) {
       isCheckout: !!result.isCheckout,
       bust: !!result.bust,
     } : { darts: 3, isLegWin: false, isCheckout: false, bust: false };
-    // Compute the score the player was trying to close out on, BEFORE
-    // submitTurnTotal01 advances `game.current` and resets scores.
-    // For x01 this is the thrower's score going into this turn.
-    // For shanghai we use the start-of-turn score (best-effort).
+    // The pre-turn target is the thrower's score going into this
+    // turn — the amount of points the player needed to clear. We
+    // capture this BEFORE submitTurnTotal01 mutates
+    // `game.players[game.current].score`. (If we read it after,
+    // we'd get the POST-turn score, which is what was wrong with
+    // the original bug — Alex was on 221 (unclosable on DO), the
+    // engine set score to 136, and `startScore = 136` then passed
+    // the closability check, so the modal fired for an unclosable
+    // pre-turn target.)
     let checkoutTarget = null;
     if (game.type === 'x01' && result) {
-      const startScore = (game.players[game.current]?.score != null)
-        ? game.players[game.current].score
-        : null;
-      // `startScore - total` would be the post-turn score (or 0 for
-      // a finish, >0 for non-finish). The checkout target is the
-      // *pre-turn* score: how many points the player needed to
-      // clear in this turn.
-      checkoutTarget = startScore;
+      checkoutTarget = preTurnScore;
     }
     game.rawDarts.push({ total, ...meta, by: throwerName });
     // A new dart invalidates the redo stack — the user threw
@@ -1838,48 +1850,93 @@ function openHistoryEdit(idx) {
         { type: 'match-end', winner: game.winner, by: game.players[game.winner]?.name }
       );
     }
-    // If the player just attempted to close out the leg (leg-win or
-    // bust on the last throw), prompt for the checkout-attempt count
-    // (only when the user has the Checkout Statistic setting on). The
-    // modal is non-blocking — `afterThrow` runs immediately so the UI
-    // updates with the new state, then the modal asks the question
-    // and the answer is attached to the entry we just pushed.
+    // If the player was on a closable score going into this turn,
+    // prompt for the checkout-attempt count (only when the user
+    // has the Checkout Statistic setting on). The modal appears
+    // for any turn at a closable target — leg-win, bust, or even
+    // an under-shoot that leaves another closable score. The
+    // modal is non-blocking — `afterThrow` runs immediately so
+    // the UI updates with the new state, then the modal asks the
+    // question and the answer is attached to the entry we just
+    // pushed.
     afterThrow();
-    if (game.type === 'x01' && checkoutTarget != null && (meta.isLegWin || meta.bust)) {
+    if (game.type === 'x01' && checkoutTarget != null) {
       // For single-in/single-out we only have the turn `total`, not
       // the individual darts — the player could have hit any
       // combination that sums to it. Without per-dart info we can't
       // tell which darts were aimed at the close-out, so we always
-      // ask. For per-dart variants (DI/TI/TO/MO) the caller has
-      // already attached the darts to the entry; we read them
-      // directly so we only prompt when at least one of the thrower's
-      // darts actually had the right multiplier for the out rule.
+      // ask when the target was closable. For per-dart variants
+      // (DI/TI/TO/MO) the caller has already attached the darts to
+      // the entry; we read them directly so we only prompt when at
+      // least one of the thrower's darts actually had the right
+      // multiplier for the out rule.
       const entryDarts = game.rawDarts[game.rawDarts.length - 1]?.dartsData || null;
-      if (shouldAskCheckout(game, entryDarts, meta)) {
+      if (shouldAskCheckout(game, entryDarts, meta, checkoutTarget, total)) {
         maybeAskCheckoutAttempts(throwerName, checkoutTarget, meta);
       }
     }
   }
 
   // Decide whether the checkout-attempt modal should appear for this
-  // turn. The rule is: the player MUST have thrown at least one
-  // dart that could legally finish the leg under the active out
-  // rule. If every dart in the turn was a non-qualifying multiplier
-  // (e.g. all single-segment hits under Double-Out), the player
-  // couldn't possibly have been aiming at the close-out and the
-  // question would be confusing. In that case we stay silent and
-  // record nothing for the entry.
+  // turn. Three gates must pass:
+  //   1. The user has the Checkout Statistic setting enabled.
+  //   2. The pre-turn target was THEORETICALLY CLOSABLE under the
+  //      active out rule. e.g. on DO the well-known unclosable
+  //      numbers are 1, 159, 162, 163, 165, 166, 168, 169, plus
+  //      everything > 170 (max 3-dart total is 180) — the player
+  //      wasn't attempting a checkout at all, so the prompt would
+  //      be confusing.
+  //   3. (Total-entry mode only) The REMAINING score after this
+  //      turn must be 1-dart closable. The remaining is:
+  //        - 0 on a leg-win (user closed out — always count it)
+  //        - target on a bust (score reverts; remaining = target)
+  //        - target - total on a normal under-shoot
+  //      Without per-dart data, the only signal we have that the
+  //      player was actually AIMING at the close-out is whether
+  //      they left a 1-dart finish. e.g. on DO 101, throwing 1
+  //      leaves 100 — but 100 needs 2 darts to close (T20+BULL),
+  //      so the player wasn't on checkout in this turn (they just
+  //      scored 1 point); don't ask. Throwing 41 from 101 leaves
+  //      60 (unclosable on DO); also don't ask. Throwing 81 from
+  //      101 leaves 20 = D10 (1-dart on DO); the player plausibly
+  //      aimed at the checkout; ask.
+  //   4. (Per-dart mode only) The throw included at least one dart
+  //      that could legally finish the leg under the active out
+  //      rule. In total-entry numpad mode we don't have per-dart
+  //      info, so we skip this gate and just trust the closability
+  //      checks.
   //
   // `entryDarts` is the array of `{segment, multiplier}` for the
-  // just-committed turn (or null when running in single-input mode
-  // where we only have a total — there we always ask).
-  function shouldAskCheckout(game, entryDarts, meta) {
+  // just-committed turn (or null when running in total-entry mode).
+  // `target` is the pre-turn score (how many points the player was
+  // trying to clear this turn). Pass null when unknown.
+  // `entryTotal` is the total points the player claimed for this
+  // turn (from the numpad), used to compute the remaining in
+  // total-entry mode. Ignored in per-dart mode.
+  function shouldAskCheckout(game, entryDarts, meta, target, entryTotal) {
     if (!loadUiStatsSettings().checkoutStats) return false;
     if (game.type !== 'x01') return false;
-    if (!meta.isLegWin && !meta.bust) return false;
-    // No per-dart info → can't infer. Always ask.
-    if (!entryDarts || !entryDarts.length) return true;
+    // Gate 2: pre-turn target must be closable under the active
+    // out rule. isClosableX01() returns false when no 1-, 2- or
+    // 3-dart finish exists for that target — the canonical
+    // "unclosable" answer for that out rule.
+    if (target == null) return false;
+    const inRule = game.opts?.in || 'single';
     const outRule = game.opts?.out || 'single';
+    if (!isClosableX01(target, { in: inRule, out: outRule }, 3)) return false;
+    // Gate 3 (total-entry mode): remaining must be 1-dart
+    // closable, OR 0 (leg-win). The remaining is target on a bust,
+    // (target - total) on a normal under-shoot, 0 on a leg-win.
+    if (!entryDarts || !entryDarts.length) {
+      if (meta.isLegWin) return true; // closed out — always count
+      const remaining = meta.bust
+        ? target
+        : Math.max(0, target - (entryTotal || 0));
+      if (remaining === 0) return true; // edge: leg-win via total=target
+      return isClosableX01(remaining, { in: inRule, out: outRule }, 1);
+    }
+    // Gate 4: at least one dart must be a legal finisher under
+    // the out rule (per-dart mode).
     if (outRule === 'single') return true; // any dart can finish
     return entryDarts.some(d => {
       const m = d?.multiplier || 1;
@@ -1913,23 +1970,50 @@ function openHistoryEdit(idx) {
     if (!entry || entry.by !== throwerName) return;
 
     const body = el('div');
+    const outcome = meta.isLegWin ? 'finished the leg'
+      : meta.bust ? 'busted'
+      : `left ${(target != null) ? target - (entry.total || 0) : '?'} (still in)`;
+    // Short summary line — who/where/result. The longer
+    // explanation ("how to answer this modal") lives in the
+    // help icon (ⓘ) next to the title; tapping ⓘ opens it in a
+    // modal. The visibility of the ⓘ honours the
+    // Settings → Help icons preference.
+    const helpVisible = isHelpEnabled();
+    const helpText = 'Tap the number of darts you aimed at the checkout. '
+      + '0 = bust (you didn\'t check out). 1, 2 or 3 = darts aimed — even if you missed. '
+      + 'The default is 0 on a bust, or your full dart count on a regular throw (you probably used all your darts at the close-out). '
+      + 'Use Skip to dismiss without recording.';
     body.appendChild(el('p', { class: 'muted', style: 'margin-top: 0;' },
-      `${throwerName} was on ${target} and ${meta.isLegWin ? 'finished' : 'busted'}. How many darts did you throw at the close-out?`));
-    body.appendChild(el('p', { class: 'small muted', style: 'margin-top: 4px;' },
-      'Enter 0 for a bust (you didn\'t close out). Enter 1, 2 or 3 for the number of darts you aimed at the close-out — even if you missed.'));
-    const input = el('input', {
-      type: 'number',
-      class: 'input',
-      min: 0,
-      max: 3,
-      value: meta.bust ? '0' : String(Math.max(1, meta.darts || 1)),
-      style: 'width: 6em; font-size: 1.2em; text-align: center;',
+      `${throwerName} was on ${target} and ${outcome}.`));
+    // 4-button segmented control: 0 / 1 / 2 / 3. Touch-friendly —
+    // each button is a tappable target, no numeric keyboard needed.
+    // Default to 0 on bust, or to meta.darts (1-3) on a regular
+    // throw (the player probably used all their darts aiming at
+    // the checkout).
+    const defaultDarts = meta.bust ? 0 : Math.max(1, Math.min(3, meta.darts || 1));
+    let selected = defaultDarts;
+    // Wrap the row in a class so the CSS can bump its size
+    // (vh-based for viewport-relative scaling, em for proportional).
+    const btnRow = el('div', { class: 'btn-row segmented checkout-dart-row' });
+    const buttons = {};
+    [0, 1, 2, 3].forEach((n) => {
+      const b = el('button', {
+        type: 'button',
+        class: 'btn segmented-btn' + (n === selected ? ' segmented-selected' : ''),
+        'data-value': String(n),
+      }, String(n));
+      b.addEventListener('click', () => {
+        selected = n;
+        Object.values(buttons).forEach(x => x.classList.remove('segmented-selected'));
+        b.classList.add('segmented-selected');
+      });
+      buttons[n] = b;
+      btnRow.appendChild(b);
     });
-    body.appendChild(el('label', { style: 'display: block; margin-top: 8px;' }, 'Darts attempted'));
-    body.appendChild(input);
+    body.appendChild(btnRow);
 
     function attach() {
-      const n = Math.max(0, Math.min(3, parseInt(input.value || '0', 10) || 0));
+      const n = Math.max(0, Math.min(3, selected | 0));
       const success = !!meta.isLegWin && n > 0;
       const updated = { ...entry, checkout: { target, dartsAttempted: n, success } };
       // Mutate in place — `game.rawDarts[entryIdx] = updated;` would
@@ -1938,20 +2022,24 @@ function openHistoryEdit(idx) {
       afterThrow(false);
     }
 
+    // Title: "Checkout attempts" (plural — the modal is a per-turn
+    // attempt counter, not a single attempt). The help icon next
+    // to the title exposes the long-form description; it's
+    // hideable via Settings → Help icons. We build the title
+    // element ourselves and pass it as the FIRST child of the
+    // body — showModal() will not add its own h3 because we
+    // pass `title: ''`.
+    const titleEl = el('h2', { class: 'modal-title checkout-modal-title' }, 'Checkout attempts');
+    titleEl.appendChild(helpIcon('Checkout attempts', helpText, helpVisible));
+    body.insertBefore(titleEl, body.firstChild);
     showModal({
-      title: 'Checkout attempt',
+      title: '',
       body,
       actions: [
         { label: 'Skip', kind: 'ghost', onClick: () => { closeModal(); } },
         { label: 'Save', kind: 'primary', onClick: () => { attach(); closeModal(); } },
       ],
     });
-    // Pressing Enter inside the input commits without going through
-    // the Save button (saves a click on touch devices).
-    input.addEventListener('keydown', (ev) => {
-      if (ev.key === 'Enter') { attach(); closeModal(); }
-    });
-    setTimeout(() => input.focus(), 50);
   }
 
   // X01 per-dart turn commit (for DI/TI/TO/MO variants).
@@ -1990,12 +2078,17 @@ function openHistoryEdit(idx) {
     );
   }
   afterThrow();
-  // If the throw was a close-out attempt (leg-win or bust), ask
-  // how many darts were aimed at the close-out. Same modal as the
-  // single-in/single-out flow — the shared `maybeAskCheckoutAttempts`
-  // helper handles both paths.
-  if (startScore != null && (meta.isLegWin || meta.bust)) {
-    maybeAskCheckoutAttempts(throwerName, startScore, meta);
+  // If the player was on a closable score going into this turn,
+  // ask how many darts were aimed at the close-out. Same modal as
+  // the single-in/single-out flow — the shared
+  // `maybeAskCheckoutAttempts` helper handles both paths. The
+  // modal appears for any turn at a closable target — leg-win,
+  // bust, or even an under-shoot that leaves another closable
+  // score.
+  if (startScore != null) {
+    if (shouldAskCheckout(game, darts, meta, startScore)) {
+      maybeAskCheckoutAttempts(throwerName, startScore, meta);
+    }
   }
   }
 

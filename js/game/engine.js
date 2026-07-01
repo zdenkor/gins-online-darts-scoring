@@ -830,9 +830,149 @@ export function checkoutSuggestions(remaining, inOutOrVariation = 'doubleOut', b
 }
 
 /* =================================================================
-   170 = T20 + T20 + BULL. Quick helper for the UI to show a big
-   "170" checkout card prominently when the player is on 170.
+   Is the given target theoretically closable in 1..budget darts
+   under the given out rule? Coarse yes/no for the checkout-statistic
+   prompt gate in the UI — does NOT return a suggested combo (use
+   `checkoutSuggestions` for that).
+
+   The `budget` argument is the dart budget the player has. Pass
+     - 1 to check "is there a 1-dart finish" (e.g. is the remaining
+       score finishable on the player's next dart?),
+     - 2 to check "is there a 1- or 2-dart finish" (e.g. is there
+       a 2-dart setup leading to a 1-dart finish?),
+     - 3 (default) to check the full checkout table (1-, 2- or
+       3-dart finish). The unclosable sets below are per-budget and
+       were brute-forced over every legal combination where the
+       last dart is a legal finisher under the out rule.
+
+   Note: for the checkout-stat prompt gate, budget=1 is the most
+   useful — "is the remaining score a 1-dart finish?" is the
+   strongest signal that the player was on checkout.
    ================================================================= */
+export function isClosableX01(target, inOutOrVariation = 'doubleOut', budget = 3) {
+  let inRule = 'single', outRule = 'double';
+  if (typeof inOutOrVariation === 'boolean') {
+    inRule = 'single'; outRule = inOutOrVariation ? 'double' : 'single';
+  } else if (typeof inOutOrVariation === 'string') {
+    const flags = x01InOutFlags({ variation: inOutOrVariation });
+    inRule = flags.inRule; outRule = flags.outRule;
+  } else if (inOutOrVariation && typeof inOutOrVariation === 'object') {
+    inRule = inOutOrVariation.in || 'single';
+    outRule = inOutOrVariation.out || 'double';
+  }
+  if (target <= 0) return false;
+  if (budget < 1) return false;
+  if (target > 180) return false;
+  const set = UNCLOSABLE[outRule]?.[budget];
+  if (set) return !set.has(target);
+  return true;
+}
+// Unclosable targets, indexed by [outRule][budget]. Brute-forced
+// over every legal 1/2/3-dart combination (segments 1-20 with
+// mult 1-3, bull (25) with mult 1-2, miss = 0) where the last
+// dart is a legal finisher under the out rule. See the
+// tests/_probe-budgets.mjs script (now removed) for the generator.
+const UNCLOSABLE = {
+  // SO: any single 1-20, S25=25, or any double 2-40 closes 1-dart
+  // up to 40. 50 = D25 is also 1-dart. 1-50 all 1-dart closable.
+  // The SO 1-dart unclosable list starts at 51+ (most numbers
+  // above 50 need 2-3 darts, but 50 itself = BULL closes).
+  single: {
+    // budget=1: 1-50 all 1-dart (S1-S20, S25=25, D1-D20=2-40, D25=50).
+    // Above 50 you need at least 2 darts.
+    1: new Set([
+      23, 29, 31, 35, 37, 41, 43, 44, 46, 47, 49, 52, 53, 55, 56, 58, 59,
+      61, 62, 63, 64, 65, 66, 67, 68, 69, 70, 71, 72, 73, 74, 75, 76, 77,
+      78, 79, 80, 81, 82, 83, 84, 85, 86, 87, 88, 89, 90, 91, 92, 93, 94,
+      95, 96, 97, 98, 99, 100, 101, 102, 103, 104, 105, 106, 107, 108, 109,
+      110, 111, 112, 113, 114, 115, 116, 117, 118, 119, 120, 121, 122, 123,
+      124, 125, 126, 127, 128, 129, 130, 131, 132, 133, 134, 135, 136, 137,
+      138, 139, 140, 141, 142, 143, 144, 145, 146, 147, 148, 149, 150, 151,
+      152, 153, 154, 155, 156, 157, 158, 159, 160, 161, 162, 163, 164, 165,
+      166, 167, 168, 169, 170, 171, 172, 173, 174, 175, 176, 177, 178, 179,
+      180,
+    ]),
+    2: new Set([
+      103, 106, 109, 112, 113, 115, 116, 118, 119, 121, 122, 123, 124, 125,
+      126, 127, 128, 129, 130, 131, 132, 133, 134, 135, 136, 137, 138, 139,
+      140, 141, 142, 143, 144, 145, 146, 147, 148, 149, 150, 151, 152, 153,
+      154, 155, 156, 157, 158, 159, 160, 161, 162, 163, 164, 165, 166, 167,
+      168, 169, 170, 171, 172, 173, 174, 175, 176, 177, 178, 179, 180,
+    ]),
+    3: new Set([163, 166, 169, 172, 173, 175, 176, 178, 179]),
+  },
+  double: {
+    1: new Set([
+      1, 3, 5, 7, 9, 11, 13, 15, 17, 19, 21, 23, 25, 27, 29, 31, 33, 35, 37,
+      39, 41, 42, 43, 44, 45, 46, 47, 48, 49, 51, 52, 53, 54, 55, 56, 57,
+      58, 59, 60, 61, 62, 63, 64, 65, 66, 67, 68, 69, 70, 71, 72, 73, 74,
+      75, 76, 77, 78, 79, 80, 81, 82, 83, 84, 85, 86, 87, 88, 89, 90, 91,
+      92, 93, 94, 95, 96, 97, 98, 99, 100, 101, 102, 103, 104, 105, 106,
+      107, 108, 109, 110, 111, 112, 113, 114, 115, 116, 117, 118, 119, 120,
+      121, 122, 123, 124, 125, 126, 127, 128, 129, 130, 131, 132, 133, 134,
+      135, 136, 137, 138, 139, 140, 141, 142, 143, 144, 145, 146, 147, 148,
+      149, 150, 151, 152, 153, 154, 155, 156, 157, 158, 159, 160, 161, 162,
+      163, 164, 165, 166, 167, 168, 169, 170, 171, 172, 173, 174, 175, 176,
+      177, 178, 179, 180,
+    ]),
+    2: new Set([
+      1, 99, 102, 103, 105, 106, 108, 109, 111, 112, 113, 114, 115, 116, 117,
+      118, 119, 120, 121, 122, 123, 124, 125, 126, 127, 128, 129, 130, 131,
+      132, 133, 134, 135, 136, 137, 138, 139, 140, 141, 142, 143, 144, 145,
+      146, 147, 148, 149, 150, 151, 152, 153, 154, 155, 156, 157, 158, 159,
+      160, 161, 162, 163, 164, 165, 166, 167, 168, 169, 170, 171, 172, 173,
+      174, 175, 176, 177, 178, 179, 180,
+    ]),
+    3: new Set([1, 159, 162, 163, 165, 166, 168, 169, 171, 172, 173, 174, 175, 176, 177, 178, 179, 180]),
+  },
+  master: {
+    1: new Set([
+      1, 3, 5, 7, 9, 11, 13, 15, 17, 19, 21, 23, 25, 27, 29, 31, 33, 35, 37,
+      39, 41, 42, 43, 44, 45, 46, 47, 48, 49, 51, 52, 53, 54, 55, 56, 57,
+      58, 59, 60, 61, 62, 63, 64, 65, 66, 67, 68, 69, 70, 71, 72, 73, 74,
+      75, 76, 77, 78, 79, 80, 81, 82, 83, 84, 85, 86, 87, 88, 89, 90, 91,
+      92, 93, 94, 95, 96, 97, 98, 99, 100, 101, 102, 103, 104, 105, 106,
+      107, 108, 109, 110, 111, 112, 113, 114, 115, 116, 117, 118, 119, 120,
+      121, 122, 123, 124, 125, 126, 127, 128, 129, 130, 131, 132, 133, 134,
+      135, 136, 137, 138, 139, 140, 141, 142, 143, 144, 145, 146, 147, 148,
+      149, 150, 151, 152, 153, 154, 155, 156, 157, 158, 159, 160, 161, 162,
+      163, 164, 165, 166, 167, 168, 169, 170, 171, 172, 173, 174, 175, 176,
+      177, 178, 179, 180,
+    ]),
+    2: new Set([
+      1, 99, 102, 103, 105, 106, 108, 109, 111, 112, 113, 114, 115, 116, 117,
+      118, 119, 120, 121, 122, 123, 124, 125, 126, 127, 128, 129, 130, 131,
+      132, 133, 134, 135, 136, 137, 138, 139, 140, 141, 142, 143, 144, 145,
+      146, 147, 148, 149, 150, 151, 152, 153, 154, 155, 156, 157, 158, 159,
+      160, 161, 162, 163, 164, 165, 166, 167, 168, 169, 170, 171, 172, 173,
+      174, 175, 176, 177, 178, 179, 180,
+    ]),
+    3: new Set([1, 159, 162, 163, 165, 166, 168, 169, 171, 172, 173, 174, 175, 176, 177, 178, 179, 180]),
+  },
+  triple: {
+    1: new Set([
+      1, 2, 4, 5, 7, 8, 10, 11, 13, 14, 16, 17, 19, 20, 22, 23, 25, 26, 28,
+      29, 31, 32, 34, 35, 37, 38, 40, 41, 43, 44, 46, 47, 49, 50, 52, 53,
+      55, 56, 58, 59, 61, 62, 63, 64, 65, 66, 67, 68, 69, 70, 71, 72, 73,
+      74, 75, 76, 77, 78, 79, 80, 81, 82, 83, 84, 85, 86, 87, 88, 89, 90,
+      91, 92, 93, 94, 95, 96, 97, 98, 99, 100, 101, 102, 103, 104, 105, 106,
+      107, 108, 109, 110, 111, 112, 113, 114, 115, 116, 117, 118, 119, 120,
+      121, 122, 123, 124, 125, 126, 127, 128, 129, 130, 131, 132, 133, 134,
+      135, 136, 137, 138, 139, 140, 141, 142, 143, 144, 145, 146, 147, 148,
+      149, 150, 151, 152, 153, 154, 155, 156, 157, 158, 159, 160, 161, 162,
+      163, 164, 165, 166, 167, 168, 169, 170, 171, 172, 173, 174, 175, 176,
+      177, 178, 179, 180,
+    ]),
+    2: new Set([
+      1, 2, 103, 106, 109, 112, 113, 115, 116, 118, 119, 121, 122, 123, 124,
+      125, 126, 127, 128, 129, 130, 131, 132, 133, 134, 135, 136, 137, 138,
+      139, 140, 141, 142, 143, 144, 145, 146, 147, 148, 149, 150, 151, 152,
+      153, 154, 155, 156, 157, 158, 159, 160, 161, 162, 163, 164, 165, 166,
+      167, 168, 169, 170, 171, 172, 173, 174, 175, 176, 177, 178, 179, 180,
+    ]),
+    3: new Set([1, 2, 163, 166, 169, 172, 173, 175, 176, 178, 179]),
+  },
+};
 /* =================================================================
    Rebuild a game from an edited rawDarts array. Used by undo and by
    the history-edit UI: we replay every accepted turn on a fresh game

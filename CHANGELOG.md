@@ -4,6 +4,31 @@ All notable changes to Gin's Online Dart's Scoring System are documented here.
 Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 Versions follow [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.5.8] - 2026-07-01
+
+### Added
+- `isClosableX01(target, inOut, budget)` engine helper. Returns true when
+  a 1-3 dart finish exists for the given target under the active out rule.
+  The `budget` argument matters: budget=1 means "1-dart finish only"
+  (used for the post-throw remaining-score check), budget=3 means the
+  full checkout table. Unclosable sets are indexed by [outRule][budget]
+  and were brute-forced over every legal 1/2/3-dart combination.
+
+### Changed
+- Checkout-attempt modal now uses two `isClosableX01` gates:
+  - **Pre-turn target** must be 3-dart closable (excludes the 7
+    classic unclosable DO numbers, the symmetric MO set, 1+2 on TO,
+    etc.). If the player wasn't on a closable score going into the
+    turn, no modal.
+  - **Post-turn remaining** must be 1-dart closable (excluding
+    leg-wins where the remaining is 0). e.g. on DO 101, throwing 1
+    leaves 100 — but 100 needs 2 darts to close (T20+BULL), so the
+    player wasn't on checkout in this turn. The 1-dart check is the
+    strongest signal in total-entry mode (no per-dart data) that
+    the player was actually aiming at the close-out.
+- Modal text now distinguishes the three outcomes: "finished the leg"
+  / "busted" / "left N (still in)".
+
 ## [0.5.7] - 2026-06-30
 
 ### Changed
