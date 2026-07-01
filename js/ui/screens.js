@@ -1989,18 +1989,35 @@ function openHistoryEdit(idx) {
     // of the ⓘ honours the Settings → Help icons preference.
     const helpVisible = isHelpEnabled();
     // Compute the smallest dart count that CAN finish the
-    // pre-turn target under the active out rule. Buttons
-    // labelled with counts BELOW this are disabled (e.g. on
-    // DO target 81 is a 2-dart finish — T19+D12 — so the "1"
-    // button is impossible and gets the `disabled` attribute).
+    // pre-turn target under the active out rule. The question
+    // is NOT "how many darts did you throw at the target" — it
+    // is "how many darts did you have AVAILABLE for the
+    // close-out" (i.e. the minimum number of darts needed to
+    // check out this target). A 1-dart finish means you only
+    // need 1 dart; a 3-dart finish means you needed all 3.
+    //
+    // Button 0 = bust (always available — you might have
+    // scored 0 intentionally, or the dart that would have
+    // closed you out missed and you bust on the wrong double).
+    // Buttons 1/2/3 are enabled ONLY for the optimal count
+    // (minDarts). Counts below minDarts are physically
+    // impossible (e.g. 81 DO = 2-dart finish, so a 1-dart
+    // finish is impossible). Counts above minDarts are
+    // intentionally wasteful — if 81 closes in 2 darts, then
+    // "3 darts" is a misuse of the stat: the user was on a
+    // 2-dart finish, not a 3-dart one, regardless of how many
+    // they actually threw.
+    //
     // On a leg-win the target is 0, which isClosableX01()
-    // returns false for; we treat that as "all counts OK" (the
-    // user just closed out, they used 1, 2 or 3 darts and we
-    // don't know which — they have to tell us).
+    // returns false for; we treat that as "any count is
+    // optimal" (we don't know if the user closed in 1, 2 or
+    // 3 darts). Busts on the final dart show all 1/2/3
+    // enabled for the same reason.
     const inOut = { in: game.opts?.in || 'single', out: game.opts?.out || 'single' };
     let minDarts = 1;
+    let allCountsValid = false;
     if (meta.isLegWin) {
-      minDarts = 1;
+      allCountsValid = true;
     } else if (target != null && target > 0) {
       minDarts = 4; // unreachable until we find a closable budget
       for (let n = 1; n <= 3; n++) {
@@ -2011,57 +2028,56 @@ function openHistoryEdit(idx) {
     const minDartsLabel = minDarts === 1 ? '1 dart'
       : minDarts === 2 ? '2 darts'
       : '3 darts';
-    const helpText = `Tap the number of darts you aimed at the checkout. `
-      + `0 = bust (you didn't check out). 1, 2 or 3 = darts aimed at the close-out — even if you missed. `
-      + `The target (${target}) is closable in ${minDartsLabel} on the active out rule, so buttons below ${minDarts} are disabled — a 1-dart finish on 81 isn't physically possible on Double Out (81 = T19+D12, that's 2 darts). `
-      + `The default is 0 on a bust, or your full dart count on a regular throw (you probably used all your darts at the close-out). `
-      + `Use Skip to dismiss without recording.`;
+    const helpText = `Tap the number of darts you had available for the close-out. `
+      + `0 = bust (you didn't check out). 1, 2 or 3 = the minimum dart count needed to close out ${target} on the active out rule — you can have that many (or more) darts left in the turn. `
+      + `The target (${target}) is closable in ${minDartsLabel} on ${(inOut.out || 'single').toUpperCase()}, so only that button is enabled — counts below are physically impossible (1 dart can't produce 81 on Double Out), and counts above are wasteful (if 81 closes in 2 darts, the close-out was a 2-dart attempt, not a 3-dart one — you only get credit for the optimal count). `
+      + `On a leg-win or a bust, all 1/2/3 counts are valid (we don't know which you used).`;
     body.appendChild(el('p', { class: 'muted', style: 'margin-top: 0;' },
       `${throwerName} was on ${target} and ${outcome}.`));
     // 4-button segmented control: 0 / 1 / 2 / 3. Touch-friendly —
     // each button is a tappable target, no numeric keyboard needed.
-    // Default to 0 on bust, or to meta.darts (1-3) on a regular
-    // throw (the player probably used all their darts aiming at
-    // the checkout). Buttons for impossible dart counts (under
-    // minDarts) are disabled — visible but not tappable.
-    const defaultDarts = meta.bust ? 0 : Math.max(minDarts, Math.min(3, meta.darts || minDarts));
-    let selected = defaultDarts;
+    // One-click: tapping a button saves + closes immediately (no
+    // Save button). Button 0 is always enabled (bust). Buttons
+    // 1/2/3 are enabled ONLY for the optimal count (minDarts) on
+    // a non-leg-win; on a leg-win/bust all are valid.
+    let selected = 0;
     // Wrap the row in a class so the CSS can bump its size
     // (vh-based for viewport-relative scaling, em for proportional).
     const btnRow = el('div', { class: 'btn-row segmented checkout-dart-row' });
     const buttons = {};
     [0, 1, 2, 3].forEach((n) => {
-      const isImpossible = n > 0 && n < minDarts;
+      // n=0 is always enabled (bust). n=1/2/3 are enabled
+      // ONLY when the count matches the optimal close-out
+      // (minDarts) for this target — counts below are
+      // physically impossible, counts above are wasteful.
+      const isEnabled = (n === 0) || allCountsValid || (n === minDarts);
       const b = el('button', {
         type: 'button',
         class: 'btn segmented-btn'
-          + (n === selected ? ' segmented-selected' : '')
-          + (isImpossible ? ' segmented-disabled' : ''),
+          + (isEnabled && n === selected ? ' segmented-selected' : '')
+          + (!isEnabled ? ' segmented-disabled' : ''),
         'data-value': String(n),
-        ...(isImpossible ? { disabled: true,
-          title: `Can't close ${target} in ${n} dart${n === 1 ? '' : 's'} on the active out rule.`,
-        } : {}),
+        ...(isEnabled ? {} : { disabled: true,
+          title: n < minDarts
+            ? `${target} is not closable in ${n} dart${n === 1 ? '' : 's'} on the active out rule.`
+            : `${target} is closable in ${minDartsLabel} on the active out rule — using more is wasteful and won't be recorded as a checkout attempt.`,
+        }),
       }, String(n));
       b.addEventListener('click', () => {
         if (b.disabled) return;
-        selected = n;
-        Object.values(buttons).forEach(x => x.classList.remove('segmented-selected'));
-        b.classList.add('segmented-selected');
+        const nVal = n;
+        const success = !!meta.isLegWin && nVal > 0;
+        const updated = { ...entry, checkout: { target, dartsAttempted: nVal, success } };
+        // Mutate in place — `game.rawDarts[entryIdx] = updated;` would
+        // break the engine's reference equality in some code paths.
+        Object.assign(entry, updated);
+        closeModal();
+        afterThrow(false);
       });
       buttons[n] = b;
       btnRow.appendChild(b);
     });
     body.appendChild(btnRow);
-
-    function attach() {
-      const n = Math.max(0, Math.min(3, selected | 0));
-      const success = !!meta.isLegWin && n > 0;
-      const updated = { ...entry, checkout: { target, dartsAttempted: n, success } };
-      // Mutate in place — `game.rawDarts[entryIdx] = updated;` would
-      // break the engine's reference equality in some code paths.
-      Object.assign(entry, updated);
-      afterThrow(false);
-    }
 
     // Title: "Checkout attempts" (plural — the modal is a per-turn
     // attempt counter, not a single attempt). The help icon next
@@ -2076,10 +2092,6 @@ function openHistoryEdit(idx) {
     showModal({
       title: '',
       body,
-      actions: [
-        { label: 'Skip', kind: 'ghost', onClick: () => { closeModal(); } },
-        { label: 'Save', kind: 'primary', onClick: () => { attach(); closeModal(); } },
-      ],
     });
   }
 
