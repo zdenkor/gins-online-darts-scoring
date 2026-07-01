@@ -12,7 +12,7 @@ import {
   throwDarts01, throwDartsCricket, throwDartsShanghai,
   submitTurnTotal01, submitTurnTotalShanghai, submitTurnCricketMarks,
   dartValue, dartLabel, MAX_DARTS_PER_TURN, MAX_TURN_TOTAL,
-  checkoutSuggestions, isClosableX01, CHECKOUT_170,
+  checkoutSuggestions, isClosableX01, maxCheckoutAttemptsForX01, CHECKOUT_170,
   X01_IN_OPTIONS, X01_OUT_OPTIONS,
   editRawDart,
 } from '../game/engine.js';
@@ -1988,58 +1988,57 @@ function openHistoryEdit(idx) {
     // the title; tapping ⓘ opens it in a modal. The visibility
     // of the ⓘ honours the Settings → Help icons preference.
     const helpVisible = isHelpEnabled();
-    // Compute the smallest dart count that CAN finish the
-    // pre-turn target under the active out rule. The question
-    // is NOT "how many darts did you throw at the target" — it
-    // is "how many darts did you have AVAILABLE for the
-    // close-out" (i.e. the minimum number of darts needed to
-    // check out this target). A 1-dart finish means you only
-    // need 1 dart; a 3-dart finish means you needed all 3.
+    // Compute the maximum dart count the player COULD have aimed
+    // at the close-out this turn. This is the count we offer as
+    // tappable buttons (1..max). The "0" button is always offered
+    // (bust). The formula is in the engine — it encodes the
+    // user's checkout-stat Excel rules per out rule (DO, MO, SO).
     //
-    // Button 0 = bust (always available — you might have
-    // scored 0 intentionally, or the dart that would have
-    // closed you out missed and you bust on the wrong double).
-    // Buttons 1/2/3 are enabled ONLY for the optimal count
-    // (minDarts). Counts below minDarts are physically
-    // impossible (e.g. 81 DO = 2-dart finish, so a 1-dart
-    // finish is impossible). Counts above minDarts are
-    // intentionally wasteful — if 81 closes in 2 darts, then
-    // "3 darts" is a misuse of the stat: the user was on a
-    // 2-dart finish, not a 3-dart one, regardless of how many
-    // they actually threw.
+    // Logic summary:
+    // - leg-win: max = 3 (1-dart finish) | 2 (2-dart) | 1 (3-dart)
+    // - non-leg-win: max = the largest number of darts the player
+    //   could have left for the close-out given the score they
+    //   actually threw. Counts ABOVE max are wasteful (the target
+    //   was closable in fewer darts). Counts BELOW the optimal
+    //   close-out budget for the remaining score are physically
+    //   impossible.
     //
-    // On a leg-win the target is 0, which isClosableX01()
-    // returns false for; we treat that as "any count is
-    // optimal" (we don't know if the user closed in 1, 2 or
-    // 3 darts). Busts on the final dart show all 1/2/3
-    // enabled for the same reason.
+    // For the modal we enable any button n in {1..max} — this
+    // matches the user's Excel rule exactly. The previous
+    // implementation only enabled the single optimal count; that
+    // was too narrow (e.g. 40 DO with max=3 should let the user
+    // record 1, 2 or 3 darts depending on how many they actually
+    // aimed at the finish).
     const inOut = { in: game.opts?.in || 'single', out: game.opts?.out || 'single' };
-    let minDarts = 1;
-    let allCountsValid = false;
-    if (meta.isLegWin) {
-      allCountsValid = true;
-    } else if (target != null && target > 0) {
-      minDarts = 4; // unreachable until we find a closable budget
+    const entryTotal = entry?.total || 0;
+    const max = maxCheckoutAttemptsForX01(target, entryTotal, inOut, !!meta.isLegWin);
+    // Per-button help text — the optimal close-out budget for
+    // the remaining score, used to explain why a button is
+    // disabled (too few darts to be possible, or above the
+    // available attempts per the Excel rule).
+    let optimalBudget = 0;
+    if (target != null && target > 0) {
       for (let n = 1; n <= 3; n++) {
-        if (isClosableX01(target, inOut, n)) { minDarts = n; break; }
+        if (isClosableX01(target, inOut, n)) { optimalBudget = n; break; }
       }
-      if (minDarts === 4) minDarts = 1; // safety: shouldn't happen (gate 2 already filtered)
     }
-    const minDartsLabel = minDarts === 1 ? '1 dart'
-      : minDarts === 2 ? '2 darts'
+    const optimalLabel = optimalBudget === 1 ? '1 dart'
+      : optimalBudget === 2 ? '2 darts'
       : '3 darts';
     const helpText = `Tap the number of darts you had available for the close-out. `
-      + `0 = bust (you didn't check out). 1, 2 or 3 = the minimum dart count needed to close out ${target} on the active out rule — you can have that many (or more) darts left in the turn. `
-      + `The target (${target}) is closable in ${minDartsLabel} on ${(inOut.out || 'single').toUpperCase()}, so only that button is enabled — counts below are physically impossible (1 dart can't produce 81 on Double Out), and counts above are wasteful (if 81 closes in 2 darts, the close-out was a 2-dart attempt, not a 3-dart one — you only get credit for the optimal count). `
-      + `On a leg-win or a bust, all 1/2/3 counts are valid (we don't know which you used).`;
+      + `0 = bust (you didn't check out). 1, 2 or 3 = the maximum dart count the rules allow for a close-out this turn — you must have had at least that many darts in hand to attempt the finish. `
+      + `The target (${target}) is closable in ${optimalLabel} on ${(inOut.out || 'double').toUpperCase()}, so only the optimal buttons are enabled — counts below ${optimalLabel} are physically impossible (1 dart can't produce 81 on Double Out), and counts above the available maximum are wasteful. `
+      + `On a leg-win the maximum is the budget of your actual finish (3 for a 1-dart, 2 for a 2-dart, 1 for a 3-dart).`;
     body.appendChild(el('p', { class: 'muted', style: 'margin-top: 0;' },
       `${throwerName} was on ${target} and ${outcome}.`));
     // 4-button segmented control: 0 / 1 / 2 / 3. Touch-friendly —
     // each button is a tappable target, no numeric keyboard needed.
     // One-click: tapping a button saves + closes immediately (no
     // Save button). Button 0 is always enabled (bust). Buttons
-    // 1/2/3 are enabled ONLY for the optimal count (minDarts) on
-    // a non-leg-win; on a leg-win/bust all are valid.
+    // 1/2/3 are enabled for every count n where n <= max (the
+    // maximum the user could have aimed at the close-out this
+    // turn, per the Excel rule). The optimal count and below are
+    // physically possible; the rest above max are wasteful.
     let selected = 0;
     // Wrap the row in a class so the CSS can bump its size
     // (vh-based for viewport-relative scaling, em for proportional).
@@ -2047,10 +2046,8 @@ function openHistoryEdit(idx) {
     const buttons = {};
     [0, 1, 2, 3].forEach((n) => {
       // n=0 is always enabled (bust). n=1/2/3 are enabled
-      // ONLY when the count matches the optimal close-out
-      // (minDarts) for this target — counts below are
-      // physically impossible, counts above are wasteful.
-      const isEnabled = (n === 0) || allCountsValid || (n === minDarts);
+      // IFF n <= max (the Excel rule).
+      const isEnabled = (n === 0) || n <= max;
       const b = el('button', {
         type: 'button',
         class: 'btn segmented-btn'
@@ -2058,9 +2055,9 @@ function openHistoryEdit(idx) {
           + (!isEnabled ? ' segmented-disabled' : ''),
         'data-value': String(n),
         ...(isEnabled ? {} : { disabled: true,
-          title: n < minDarts
+          title: n < optimalBudget
             ? `${target} is not closable in ${n} dart${n === 1 ? '' : 's'} on the active out rule.`
-            : `${target} is closable in ${minDartsLabel} on the active out rule — using more is wasteful and won't be recorded as a checkout attempt.`,
+            : `You didn't have that many darts available for the close-out this turn (max ${max} per the rules).`,
         }),
       }, String(n));
       b.addEventListener('click', () => {

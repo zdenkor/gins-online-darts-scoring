@@ -84,7 +84,22 @@ export function x01InOutFlags(opts = {}) {
 
 function isDouble(d) { return d && d.multiplier === 2; }
 function isTriple(d) { return d && d.multiplier === 3; }
+// Master IN: a dart "opens" scoring on a master-in game only if
+// it lands on a double (D1..D20) or the double bull (D25 = 50).
+// Triples and single bull do NOT count as opening — that's the
+// standard master-in convention.
 function isMasterHit(d) { return isDouble(d) || (d.segment === 25 && d.multiplier === 2); }
+// Master OUT: a dart "finishes" the leg on a master-out game if
+// it lands on a double (D1..D20), a triple (T1..T20), or the
+// double bull (D25 = 50). Per the rules in this app, the
+// SINGLE bull (S25 = 25) does NOT count as a finishing dart —
+// the dart that closes the leg must be a double, triple, or
+// double bull. This matches the canonical Master Out convention
+// (also called "double, treble, or bull" in tournament rules).
+function isMasterOutHit(d) {
+  if (d.segment === 25) return d.multiplier === 2; // D25 = 50 only, not S25 = 25
+  return isDouble(d) || isTriple(d);
+}
 function opensScoring(d, inRule) {
   if (inRule === 'double') return isDouble(d);
   if (inRule === 'triple') return isTriple(d);
@@ -94,7 +109,7 @@ function opensScoring(d, inRule) {
 function finishesLeg(d, outRule) {
   if (outRule === 'double') return isDouble(d);
   if (outRule === 'triple') return isTriple(d);
-  if (outRule === 'master') return isMasterHit(d);
+  if (outRule === 'master') return isMasterOutHit(d);
   return true;
 }
 
@@ -867,6 +882,147 @@ export function isClosableX01(target, inOutOrVariation = 'doubleOut', budget = 3
   if (set) return !set.has(target);
   return true;
 }
+
+/* =================================================================
+   maxCheckoutAttemptsForX01 — given the pre-turn target, the
+   points scored (total), and the active out rule, return the
+   maximum number of darts the player COULD have aimed at the
+   close-out this turn. The result is 0, 1, 2 or 3.
+
+   Logic (ported from the per-out-rule Excel formulas the user
+   maintains in their stats spreadsheet):
+
+     out=double  (DO) — D1..D20 + D-BULL are 1-dart finishers.
+       leg-win: 3 (1-dart C2<=40 or C2=50) | 2 (C2<=100, not in
+                 {91,93,95,97,99}) | 1 (otherwise)
+       else:     0 (B2>170, B2 in unclosable DO, B2=1, D2<0, D2=1)
+                 3 (1-dart B2: B2<=40 even, or B2=50)
+                 2 (B2<=100 not in unclosable AND C2>=B2-40)
+                 1 (B2 in {101..170} AND C2>=B2-40)
+                 0 (otherwise — not enough scored for 1-dart)
+
+     out=master  (MO) — D1..D20, T1..T20, D-BULL are 1-dart
+     finishers. Triple-out doubles the set of 1-dart finishers
+     vs DO.
+       leg-win: 3 (1-dart C2: C2<=60 with C2 even OR divisible
+                 by 3, OR C2=50) | 2 (C2<=120) | 1 (otherwise)
+       else:     0 (B2>180, D2<0, D2=1)
+                 3 (1-dart B2: B2<=60 even OR divisible by 3,
+                    OR B2=50)
+                 2 (B2<=120 AND C2>=B2-60)
+                 1 (B2 in {121..180} AND C2>=B2-60)
+                 0 (otherwise)
+
+     out=single  (SO) — any 1-dart hit 1..60 is a 1-dart finisher.
+       leg-win: 3 (C2<=60) | 2 (C2<=120) | 1 (otherwise)
+       else:     0 (B2>180, D2<0)
+                 3 (B2<=60)
+                 2 (B2<=120 AND C2>=B2-60)
+                 1 (B2 in {121..180} AND C2>=B2-60)
+                 0 (otherwise)
+
+   The "C2>=B2-60" check is the gate that turns 1-dart close
+   into "the player still had a 1-dart finish available" — for
+   Y=3 targets (3-dart target) that means they had to score at
+   least B2-60 to leave a 1-dart finish; otherwise max=0.
+   ================================================================= */
+function isOneDartDO(score) {
+  if (score === 50) return true;             // D-BULL
+  return score > 0 && score <= 40 && score % 2 === 0; // D1..D20
+}
+function isOneDartMO(score) {
+  if (score === 50) return true;             // D-BULL
+  if (score <= 0 || score > 60) return false;
+  return score % 2 === 0 || score % 3 === 0; // D1..D20, T1..T20
+}
+function isOneDartSO(score) {
+  return score > 0 && score <= 60;            // any single, double, triple 1-60
+}
+const UNCLOSABLE_2_3_DO = new Set([91, 93, 95, 97, 99]);
+// DO 3-dart-unclosable numbers (subset used in the early guard
+// of maxCheckoutAttemptsForX01). Mirror of the top entries of
+// UNCLOSABLE.double[3] defined further down.
+const UNCLOSABLE_DO_3DART = new Set([
+  1, 159, 162, 163, 165, 166, 168, 169, 171, 172, 173, 174, 175, 176, 177, 178, 179, 180,
+]);
+
+export function maxCheckoutAttemptsForX01(target, total, inOut, isLegWin = false) {
+  const out = (inOut && inOut.out) || 'double';
+  const C2 = total | 0;
+  const B2 = target | 0;
+  const D2 = B2 - C2;
+  const isLeg = !!isLegWin || D2 === 0;
+
+  if (out === 'double') {
+    if (isLeg) {
+      if (isOneDartDO(C2)) return 3;
+      if (C2 <= 100 && !UNCLOSABLE_2_3_DO.has(C2)) return 2;
+      return 1;
+    }
+    if (B2 > 170 || UNCLOSABLE_DO_3DART.has(B2) || B2 === 1 || D2 < 0 || D2 === 1) return 0;
+    if (isOneDartDO(B2)) return 3;
+    if (B2 <= 100 && !UNCLOSABLE_2_3_DO.has(B2)) {
+      if (C2 >= (B2 - 40)) return 2;
+      if (C2 >= (B2 - 50)) return 1;
+      return 0;
+    }
+    if (C2 >= (B2 - 40)) return 1;
+    return 0;
+  }
+
+  if (out === 'master') {
+    if (isLeg) {
+      if (isOneDartMO(C2)) return 3;
+      if (C2 <= 120) return 2;
+      return 1;
+    }
+    if (B2 > 180 || D2 < 0 || D2 === 1) return 0;
+    if (isOneDartMO(B2)) return 3;
+    if (B2 <= 120) {
+      if (C2 >= (B2 - 60)) return 2;
+      return 0;
+    }
+    if (C2 >= (B2 - 60)) return 1;
+    return 0;
+  }
+
+  if (out === 'single') {
+    if (isLeg) {
+      if (C2 <= 60) return 3;
+      if (C2 <= 120) return 2;
+      return 1;
+    }
+    if (B2 > 180 || D2 < 0) return 0;
+    if (B2 <= 60) return 3;
+    if (B2 <= 120) {
+      if (C2 >= (B2 - 60)) return 2;
+      return 0;
+    }
+    if (C2 >= (B2 - 60)) return 1;
+    return 0;
+  }
+
+  // out=triple (no Excel formula provided yet) — fall back to
+  // the SO behaviour as a reasonable default. Can be tightened
+  // once a per-out triple formula is added.
+  if (out === 'triple') {
+    if (isLeg) {
+      if (C2 <= 60) return 3;
+      if (C2 <= 120) return 2;
+      return 1;
+    }
+    if (B2 > 180 || D2 < 0) return 0;
+    if (B2 <= 60) return 3;
+    if (B2 <= 120) {
+      if (C2 >= (B2 - 60)) return 2;
+      return 0;
+    }
+    if (C2 >= (B2 - 60)) return 1;
+    return 0;
+  }
+
+  return 0;
+}
 // Unclosable targets, indexed by [outRule][budget]. Brute-forced
 // over every legal 1/2/3-dart combination (segments 1-20 with
 // mult 1-3, bull (25) with mult 1-2, miss = 0) where the last
@@ -926,28 +1082,30 @@ const UNCLOSABLE = {
     3: new Set([1, 159, 162, 163, 165, 166, 168, 169, 171, 172, 173, 174, 175, 176, 177, 178, 179, 180]),
   },
   master: {
+    // budget=1: 1-dart MO finish = D1..D20 (2, 4, ..., 40), T1..T20
+    // (3, 6, ..., 60), or D25 (= 50). All other targets in 1..180
+    // need 2-3 darts. (1 and 25 (S-BULL) are not legal finishers
+    // under the new MO definition.)
     1: new Set([
-      1, 3, 5, 7, 9, 11, 13, 15, 17, 19, 21, 23, 25, 27, 29, 31, 33, 35, 37,
-      39, 41, 42, 43, 44, 45, 46, 47, 48, 49, 51, 52, 53, 54, 55, 56, 57,
-      58, 59, 60, 61, 62, 63, 64, 65, 66, 67, 68, 69, 70, 71, 72, 73, 74,
-      75, 76, 77, 78, 79, 80, 81, 82, 83, 84, 85, 86, 87, 88, 89, 90, 91,
-      92, 93, 94, 95, 96, 97, 98, 99, 100, 101, 102, 103, 104, 105, 106,
-      107, 108, 109, 110, 111, 112, 113, 114, 115, 116, 117, 118, 119, 120,
-      121, 122, 123, 124, 125, 126, 127, 128, 129, 130, 131, 132, 133, 134,
-      135, 136, 137, 138, 139, 140, 141, 142, 143, 144, 145, 146, 147, 148,
-      149, 150, 151, 152, 153, 154, 155, 156, 157, 158, 159, 160, 161, 162,
-      163, 164, 165, 166, 167, 168, 169, 170, 171, 172, 173, 174, 175, 176,
-      177, 178, 179, 180,
-    ]),
-    2: new Set([
-      1, 99, 102, 103, 105, 106, 108, 109, 111, 112, 113, 114, 115, 116, 117,
+      0, 1, 5, 7, 11, 13, 17, 19, 23, 25, 29, 31, 35, 37, 41, 43, 44, 46, 47,
+      49, 52, 53, 55, 56, 58, 59, 61, 62, 63, 64, 65, 66, 67, 68, 69, 70,
+      71, 72, 73, 74, 75, 76, 77, 78, 79, 80, 81, 82, 83, 84, 85, 86, 87,
+      88, 89, 90, 91, 92, 93, 94, 95, 96, 97, 98, 99, 100, 101, 102, 103,
+      104, 105, 106, 107, 108, 109, 110, 111, 112, 113, 114, 115, 116, 117,
       118, 119, 120, 121, 122, 123, 124, 125, 126, 127, 128, 129, 130, 131,
       132, 133, 134, 135, 136, 137, 138, 139, 140, 141, 142, 143, 144, 145,
       146, 147, 148, 149, 150, 151, 152, 153, 154, 155, 156, 157, 158, 159,
       160, 161, 162, 163, 164, 165, 166, 167, 168, 169, 170, 171, 172, 173,
       174, 175, 176, 177, 178, 179, 180,
     ]),
-    3: new Set([1, 159, 162, 163, 165, 166, 168, 169, 171, 172, 173, 174, 175, 176, 177, 178, 179, 180]),
+    2: new Set([
+      0, 1, 103, 106, 109, 112, 113, 115, 116, 118, 119, 121, 122, 123, 124,
+      125, 126, 127, 128, 129, 130, 131, 132, 133, 134, 135, 136, 137, 138,
+      139, 140, 141, 142, 143, 144, 145, 146, 147, 148, 149, 150, 151, 152,
+      153, 154, 155, 156, 157, 158, 159, 160, 161, 162, 163, 164, 165, 166,
+      167, 168, 169, 170, 171, 172, 173, 174, 175, 176, 177, 178, 179, 180,
+    ]),
+    3: new Set([0, 1, 163, 166, 169, 172, 173, 175, 176, 178, 179]),
   },
   triple: {
     1: new Set([

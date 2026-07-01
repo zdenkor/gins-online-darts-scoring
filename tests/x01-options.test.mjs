@@ -3,7 +3,7 @@ import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import {
   new01, throwDarts01, submitTurnTotal01,
-  resolveBullThrow, checkoutSuggestions, isClosableX01, CHECKOUT_170,
+  resolveBullThrow, checkoutSuggestions, isClosableX01, maxCheckoutAttemptsForX01, CHECKOUT_170,
   MAX_TURN_TOTAL,
 } from '../js/game/engine.js';
 
@@ -161,13 +161,24 @@ test('isClosableX01: classic DO closables (40, 50, 120, 170)', () => {
       `target=${t} should be closable on DO`);
   }
 });
-test('isClosableX01: MO unclosables include 1 + the same high-end set as DO', () => {
-  for (const t of [1, 159, 162, 163, 165, 166, 168, 169]) {
+test('isClosableX01: MO unclosables — 1, 163, 166, 169, 172, 173, 175, 176, 178, 179 in budget 3', () => {
+  // With the canonical MO finisher set (D + T + D-BULL), the
+  // 3-dart-unclosable set shrinks vs the old "D + D-BULL only"
+  // definition. 159 / 162 / 165 / 168 are now closable (T's are
+  // legal finishers). The remaining 3-dart-unclosable numbers
+  // are: 1, 163, 166, 169, 172, 173, 175, 176, 178, 179.
+  for (const t of [1, 163, 166, 169, 172, 173, 175, 176, 178, 179]) {
     assert.equal(isClosableX01(t, { in: 'single', out: 'master' }, 3), false,
-      `target=${t} should be unclosable on MO`);
+      `target=${t} should be 3-dart unclosable on MO`);
   }
+  // Numbers that WERE 3-dart-unclosable under the old definition
+  // are now closable — sanity-check a few.
   assert.equal(isClosableX01(50, { in: 'single', out: 'master' }, 3), true); // BULL
   assert.equal(isClosableX01(170, { in: 'single', out: 'master' }, 3), true); // T20+T20+BULL
+  assert.equal(isClosableX01(159, { in: 'single', out: 'master' }, 3), true); // closable via T's
+  assert.equal(isClosableX01(162, { in: 'single', out: 'master' }, 3), true);
+  assert.equal(isClosableX01(60, { in: 'single', out: 'master' }, 1), true);  // T20 = 60 (1-dart)
+  assert.equal(isClosableX01(45, { in: 'single', out: 'master' }, 1), true);  // T15 = 45
 });
 test('isClosableX01: TO unclosables include 1, 2 (smallest triple is T1=3)', () => {
   for (const t of [1, 2]) {
@@ -393,4 +404,118 @@ test('max-darts-per-leg: resets between legs', () => {
   assert.equal(g.players[0].score, 100); // new leg
   assert.equal(g.players[0].legsWon, 1);
   assert.equal(g.players[0].dartsThisLeg, 0); // reset for new leg
+});
+
+/* ---------- maxCheckoutAttemptsForX01 ----------
+   The function encodes the user's checkout-stat Excel rules
+   per out rule. The formula is per-out-rule:
+   - DO: D1..D20 + D-BULL 1-dart finishers
+   - MO: D1..D20 + T1..T20 + D-BULL 1-dart finishers
+   - SO: any 1-60 1-dart finisher
+   For each scenario we test the maximum number of darts the
+   player could have aimed at the close-out this turn. */
+test('maxCheckoutAttemptsForX01: DO — leg-win counts by budget', () => {
+  const inOut = { in: 'single', out: 'double' };
+  // 1-dart DO finish
+  assert.equal(maxCheckoutAttemptsForX01(40, 40, inOut, true), 3);  // D20
+  assert.equal(maxCheckoutAttemptsForX01(50, 50, inOut, true), 3);  // D-BULL
+  assert.equal(maxCheckoutAttemptsForX01(2, 2, inOut, true), 3);    // D1
+  // 2-dart DO finish (not in unclosable {91,93,95,97,99})
+  assert.equal(maxCheckoutAttemptsForX01(81, 81, inOut, true), 2);
+  assert.equal(maxCheckoutAttemptsForX01(100, 100, inOut, true), 2);
+  // 3-dart DO finish
+  assert.equal(maxCheckoutAttemptsForX01(170, 170, inOut, true), 1);
+});
+
+test('maxCheckoutAttemptsForX01: DO — non-leg-win gates by C2 >= B2-X', () => {
+  const inOut = { in: 'single', out: 'double' };
+  // 1-dart target (B2<=40 even, or B2=50) → max=3 always
+  assert.equal(maxCheckoutAttemptsForX01(40, 10, inOut, false), 3);
+  assert.equal(maxCheckoutAttemptsForX01(50, 0, inOut, false), 3);
+  // 2-dart target (B2<=100 not in unclosable):
+  //   C2 >= B2-40 → max=2; C2 >= B2-50 → max=1; else 0
+  assert.equal(maxCheckoutAttemptsForX01(81, 60, inOut, false), 2);  // 60>=41
+  assert.equal(maxCheckoutAttemptsForX01(81, 50, inOut, false), 2);  // 50>=41
+  assert.equal(maxCheckoutAttemptsForX01(81, 41, inOut, false), 2);  // 41>=41
+  assert.equal(maxCheckoutAttemptsForX01(81, 40, inOut, false), 1);  // 40>=31 (B2-50)
+  assert.equal(maxCheckoutAttemptsForX01(81, 31, inOut, false), 1);  // 31>=31
+  assert.equal(maxCheckoutAttemptsForX01(81, 30, inOut, false), 0);  // 30<31
+  // 3-dart target (B2 in {101..170}):
+  //   C2 >= B2-40 → max=1; else 0
+  assert.equal(maxCheckoutAttemptsForX01(170, 130, inOut, false), 1);  // 130>=130
+  assert.equal(maxCheckoutAttemptsForX01(170, 129, inOut, false), 0);  // 129<130
+  // Unclosable DO targets → 0
+  assert.equal(maxCheckoutAttemptsForX01(169, 100, inOut, false), 0);
+  assert.equal(maxCheckoutAttemptsForX01(1, 0, inOut, false), 0);
+});
+
+test('maxCheckoutAttemptsForX01: MO — leg-win counts by budget', () => {
+  const inOut = { in: 'single', out: 'master' };
+  // 1-dart MO finish: D, T, or D-BULL
+  assert.equal(maxCheckoutAttemptsForX01(40, 40, inOut, true), 3);  // D20
+  assert.equal(maxCheckoutAttemptsForX01(50, 50, inOut, true), 3);  // D-BULL
+  assert.equal(maxCheckoutAttemptsForX01(60, 60, inOut, true), 3);  // T20
+  assert.equal(maxCheckoutAttemptsForX01(45, 45, inOut, true), 3);  // T15
+  // 2-dart MO finish (C2<=120)
+  assert.equal(maxCheckoutAttemptsForX01(100, 100, inOut, true), 2);
+  // 3-dart MO finish (C2>120)
+  assert.equal(maxCheckoutAttemptsForX01(170, 170, inOut, true), 1);
+});
+
+test('maxCheckoutAttemptsForX01: MO — non-leg-win gates by C2 >= B2-60', () => {
+  const inOut = { in: 'single', out: 'master' };
+  // 1-dart target (B2<=60 even/div3, or B2=50) → max=3 always
+  assert.equal(maxCheckoutAttemptsForX01(50, 0, inOut, false), 3);
+  assert.equal(maxCheckoutAttemptsForX01(60, 0, inOut, false), 3);
+  // 2-dart target (B2<=120):
+  //   C2 >= B2-60 → max=2; else 0
+  assert.equal(maxCheckoutAttemptsForX01(100, 60, inOut, false), 2);  // 60>=40
+  assert.equal(maxCheckoutAttemptsForX01(100, 39, inOut, false), 0);  // 39<40
+  // 3-dart target (B2 in {121..180}):
+  //   C2 >= B2-60 → max=1; else 0
+  assert.equal(maxCheckoutAttemptsForX01(170, 130, inOut, false), 1);  // 130>=110
+  assert.equal(maxCheckoutAttemptsForX01(170, 109, inOut, false), 0);  // 109<110
+  // Unclosable MO targets → 0
+  assert.equal(maxCheckoutAttemptsForX01(1, 0, inOut, false), 0);
+  assert.equal(maxCheckoutAttemptsForX01(163, 100, inOut, false), 0);
+});
+
+test('maxCheckoutAttemptsForX01: SO — leg-win counts by budget', () => {
+  const inOut = { in: 'single', out: 'single' };
+  // 1-dart SO finish (C2<=60)
+  assert.equal(maxCheckoutAttemptsForX01(60, 60, inOut, true), 3);
+  assert.equal(maxCheckoutAttemptsForX01(40, 40, inOut, true), 3);
+  // 2-dart SO finish (C2<=120)
+  assert.equal(maxCheckoutAttemptsForX01(100, 100, inOut, true), 2);
+  // 3-dart SO finish (C2>120)
+  assert.equal(maxCheckoutAttemptsForX01(170, 170, inOut, true), 1);
+});
+
+test('maxCheckoutAttemptsForX01: SO — non-leg-win gates by C2 >= B2-60', () => {
+  const inOut = { in: 'single', out: 'single' };
+  // 1-dart target (B2<=60) → max=3 always
+  assert.equal(maxCheckoutAttemptsForX01(60, 0, inOut, false), 3);
+  assert.equal(maxCheckoutAttemptsForX01(60, 20, inOut, false), 3);
+  // 2-dart target (B2<=120):
+  //   C2 >= B2-60 → max=2; else 0
+  assert.equal(maxCheckoutAttemptsForX01(100, 60, inOut, false), 2);  // 60>=40
+  assert.equal(maxCheckoutAttemptsForX01(100, 30, inOut, false), 0);  // 30<40
+  // 3-dart target (B2 in {121..180}):
+  //   C2 >= B2-60 → max=1; else 0
+  assert.equal(maxCheckoutAttemptsForX01(180, 150, inOut, false), 1);  // 150>=120
+  assert.equal(maxCheckoutAttemptsForX01(180, 60, inOut, false), 0);   // 60<120
+});
+
+test('maxCheckoutAttemptsForX01: bust (D2<0) returns 0 for all out rules', () => {
+  // B2 - C2 < 0 means the player overshot → bust
+  assert.equal(maxCheckoutAttemptsForX01(50, 60, { in: 'single', out: 'double' }, false), 0);
+  assert.equal(maxCheckoutAttemptsForX01(50, 60, { in: 'single', out: 'master' }, false), 0);
+  assert.equal(maxCheckoutAttemptsForX01(50, 60, { in: 'single', out: 'single' }, false), 0);
+});
+
+test('maxCheckoutAttemptsForX01: leg-win with meta.isLegWin=false but D2=0 still treated as leg', () => {
+  // Some callers pass isLegWin=false even though D2=0 means exact
+  // score (leg-win by definition). Function should still pick
+  // up the leg-win branch.
+  assert.equal(maxCheckoutAttemptsForX01(40, 40, { in: 'single', out: 'double' }, false), 3);
 });
