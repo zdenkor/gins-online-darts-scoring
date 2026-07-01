@@ -1057,6 +1057,31 @@ select.input option, select.dropdown-readable option {
 .player-card .score.long {
   font-size: clamp(30px, 6.5vw, 54px);
 }
+/* Match-score row: sets-won (smaller) above legs-won in the
+   current set (larger). Sits under the big .score and uses the
+   same vh-based sizing as the rest of the card so it scales
+   with viewport. The two lines are stacked vertically inside a
+   single .match-score container so the column stays narrow. */
+.player-card .match-score {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  line-height: 1;
+  font-variant-numeric: tabular-nums;
+  margin-top: 0.4em;
+  color: var(--muted);
+}
+.player-card .match-sets {
+  font-size: 0.9em;
+  font-weight: 600;
+  letter-spacing: 0.4px;
+  opacity: 0.75;
+}
+.player-card .match-legs {
+  font-size: 1.5em;
+  font-weight: 700;
+  color: var(--text);
+}
 .player-card .last-round { display: none; }
 
 /* Per-player history row inside the card, directly under the score. */

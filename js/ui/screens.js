@@ -2726,6 +2726,34 @@ function renderPlayerCard(player, idx, game, onClick) {
   const scoreClass = 'score' + (scoreStr.length >= 4 ? ' long' : '');
   card.appendChild(el('div', { class: scoreClass }, scoreStr));
 
+  // Match-score row: shows sets-won (smaller) above legs-won in the
+  // current set (larger). Hidden when the count is 1 — single-set /
+  // single-leg games don't need the annotation, otherwise every card
+  // would carry redundant "0 / 0" decoration.
+  //
+  // Only shown for X01. Cricket has its own scorecard below; the
+  // sets/legs fields aren't meaningful for it.
+  if (game.type === 'x01') {
+    const setsToWin = (game.opts && game.opts.setsToWin) || 1;
+    const legsToWin = (game.opts && game.opts.legsToWin) || 1;
+    const showSets = setsToWin > 1;
+    const showLegs = legsToWin > 1;
+    if (showSets || showLegs) {
+      const matchEl = el('div', { class: 'match-score' });
+      if (showSets) {
+        matchEl.appendChild(el('div', { class: 'match-sets',
+          title: 'Sets won (first to ' + setsToWin + ')' },
+          String(player.setsWon || 0)));
+      }
+      if (showLegs) {
+        matchEl.appendChild(el('div', { class: 'match-legs',
+          title: 'Legs won in this set (first to ' + legsToWin + ')' },
+          String(player.legsWon || 0)));
+      }
+      card.appendChild(matchEl);
+    }
+  }
+
   // Cricket gets a compact one-row mark grid below the score; other
   // modes have nothing more to show (the toolbar already shows legs/
   // sets/darts-this-leg, so we don't duplicate it here).
