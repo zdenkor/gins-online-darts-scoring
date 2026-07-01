@@ -739,61 +739,27 @@ function renderSettings(router) {
     'Statistics settings'));
 
   // Checkout Statistic sub-sub-section — toggle on/off whether the
-  // Stats page shows the checkout-statistic table.
+  // Stats page shows the checkout-statistic table. Mirrors the
+  // Debug overlay toggle pattern (toggleRow + onChange callback);
+  // the previous "click-again to reset to default" behaviour is
+  // removed for consistency.
   const checkoutSub = el('div', { class: 'sub-sub-section', style: 'margin-left: 8px; margin-top: 4px;' });
   checkoutSub.appendChild(el('h5', { style: 'margin: 6px 0 4px; font-size: 0.9em; color: var(--text); font-weight: 600; text-transform: uppercase; letter-spacing: .6px;' },
     'Checkout Statistic'));
   checkoutSub.appendChild(el('p', { class: 'small muted', style: 'margin: 0 0 8px;' },
     'Show the per-player checkout success rate on the Stats page.'));
-  const toggleCheckoutStats = async (enabled) => {
-    if (enabled === null) {
-      // Clicked the already-selected option → reset to default (on).
-      await saveUiStatsSettings({ checkoutStats: true });
-      toast('Checkout Statistic on');
-      applyCheckoutStatsBtn(true);
-      return;
+  const initialCheckout = loadUiStatsSettings().checkoutStats ? 'on' : 'off';
+  const checkoutRow = toggleRow(
+    'Show Checkout Statistic',
+    [{ value: 'on', label: 'On' }, { value: 'off', label: 'Off' }],
+    initialCheckout,
+    (selected) => {
+      const enabled = selected === 'on';
+      saveUiStatsSettings({ checkoutStats: enabled });
+      toast(enabled ? 'Checkout Statistic on' : 'Checkout Statistic off');
     }
-    await saveUiStatsSettings({ checkoutStats: enabled });
-    toast(enabled ? 'Checkout Statistic on' : 'Checkout Statistic off');
-    applyCheckoutStatsBtn(enabled);
-  };
-  // Re-derive the On/Off segmented toggle. The currently-saved value
-  // selects which button gets the active class. The buttons are
-  // captured in `checkoutStatBtns` so `applyCheckoutStatsBtn` can
-  // imperatively update the active state.
-  const checkoutStatBtns = [];
-  const applyCheckoutStatsBtn = (val) => {
-    checkoutStatBtns.forEach((b) => {
-      const isOn = b.dataset.value === 'on';
-      b.classList.toggle('on', isOn && val);
-      b.classList.toggle('active', isOn ? val : !val);
-    });
-  };
-  const checkoutRow = (() => {
-    const wrap = el('div', { class: 'field button-row-field' });
-    wrap.appendChild(el('label', {}, 'Show Checkout Statistic'));
-    const row = el('div', { class: 'btn-row segmented' });
-    [{ value: 'on', label: 'On' }, { value: 'off', label: 'Off' }].forEach(o => {
-      const b = el('button', {
-        class: 'btn small',
-        type: 'button',
-        'data-value': o.value,
-        onclick: () => {
-          // Click on the active option again → reset to default.
-          const current = loadUiStatsSettings().checkoutStats;
-          const target = o.value === 'on';
-          toggleCheckoutStats(current === target ? null : target);
-        },
-      }, o.label);
-      checkoutStatBtns.push(b);
-      row.appendChild(b);
-    });
-    wrap.appendChild(row);
-    return wrap;
-  })();
-  // Mark the current saved value as active.
-  applyCheckoutStatsBtn(loadUiStatsSettings().checkoutStats);
-  checkoutSub.appendChild(checkoutRow);
+  );
+  checkoutSub.appendChild(checkoutRow.wrap);
 
   statsSection.appendChild(checkoutSub);
   settingsSection.appendChild(statsSection);
