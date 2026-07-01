@@ -1,6 +1,6 @@
 {
-  "name": "gin-darts",
-  "version": "0.5.8",
+  "name": "gins-online-darts-scoring",
+  "version": "0.6.0",
   "description": "Gin's Online Dart's Scoring System — serverless dart scoring web app",
   "type": "module",
   "private": true,
