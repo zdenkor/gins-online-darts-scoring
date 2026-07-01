@@ -1,5 +1,5 @@
 // Minimal cache-first service worker so the app works offline once loaded.
-const CACHE = 'gin-darts-v0.5.6';
+const CACHE = 'gin-darts-v0.5.7';
 const ASSETS = [
   './',
   './index.html',

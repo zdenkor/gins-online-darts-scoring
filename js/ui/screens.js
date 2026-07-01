@@ -5,7 +5,7 @@
 
 import { el, toast, copyToClipboard, formatDuration, showModal, closeModal, buttonRow, capButtonRow, toggleRow, x01GameOptionsControls } from '../util/helpers.js';
 import { enableDebugOverlay, disableDebugOverlay, isDebugOverlayOn } from '../util/debug-overlay.js';
-import { store, getStats, saveLastGame, recordGameResult, loadLastGame, getGameHistory } from '../util/store.js';
+import { store, getStats, saveLastGame, recordGameResult, loadLastGame, getGameHistory, loadUiStatsSettings, saveUiStatsSettings } from '../util/store.js';
 import { HostRoom, GuestRoom } from '../net/rtc.js';
 import {
   new01, newCricket, newShanghai,
@@ -254,15 +254,23 @@ function updateHeader() {
     }
   }
 
-  // Cursor settings icon: opens a quick settings modal. Placed to the
-  // right of sign-out, styled like the inactive auth icons.
-  const cursorSettingsBtn = el('button', {
+  // Settings icon: gear that opens the full Settings screen (sign-in,
+  // SVK cache, every sub-section — Display / Assistance / Statistics —
+  // and About). Placed to the right of sign-out, styled like the
+  // inactive auth icons.
+  const settingsBtn = el('button', {
     class: 'icon-btn auth-btn settings-btn',
-    title: 'Cursor settings',
-    'aria-label': 'Cursor settings',
-    onclick: () => openCursorSettings(),
+    title: 'Settings',
+    'aria-label': 'Settings',
+    onclick: () => {
+      if (typeof _router === 'object' && _router && typeof _router.go === 'function') {
+        _router.go('settings');
+      } else {
+        location.hash = '#settings';
+      }
+    },
   });
-  cursorSettingsBtn.innerHTML = '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" aria-hidden="true"><path d="M12 1a9 9 0 0 0-1.46.13l-.86.14-.4 2.37c-.55.13-1.08.33-1.58.57l-1.9-1.35-1.58 1.58 1.35 1.9a7.1 7.1 0 0 0-.57 1.58l-2.37.4-.14.86A9 9 0 0 0 1 12a9 9 0 0 0 .13 1.46l.14.86 2.37.4c.13.55.33 1.08.57 1.58l-1.35 1.9 1.58 1.58 1.9-1.35c.5.24 1.03.44 1.58.57l.4 2.37.86.14A9 9 0 0 0 12 23a9 9 0 0 0 1.46-.13l.86-.14.4-2.37c.55-.13 1.08-.33 1.58-.57l1.9 1.35 1.58-1.58-1.35-1.9a7.1 7.1 0 0 0 .57-1.58l2.37-.4.14-.86A9 9 0 0 0 23 12a9 9 0 0 0-.13-1.46l-.14-.86-2.37-.4a7.1 7.1 0 0 0-.57-1.58l1.35-1.9-1.58-1.58-1.9 1.35a7.1 7.1 0 0 0-1.58-.57l-.4-2.37-.86-.14A9 9 0 0 0 12 1Zm0 6a5 5 0 1 1 0 10 5 5 0 0 1 0-10Z"/></svg>';
+  settingsBtn.innerHTML = '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512" aria-hidden="true"><!--! Font Awesome Free 6.7.2 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license/free (Icons: CC BY 4.0, Fonts: SIL OFL 1.1, Code: MIT License) Copyright 2024 Fonticons, Inc. --><path d="M495.9 166.6c3.2 8.7 .5 18.4-6.4 24.6l-43.3 39.4c1.1 8.3 1.7 16.8 1.7 25.4s-.6 17.1-1.7 25.4l43.3 39.4c6.9 6.2 9.6 15.9 6.4 24.6c-4.4 11.9-9.7 23.3-15.8 34.3l-4.7 8.1c-6.6 11-14 21.4-22.1 31.2c-5.9 7.2-15.7 9.6-24.5 6.8l-55.7-17.7c-13.4 10.3-28.2 18.9-44 25.4l-12.5 57.1c-2 9.1-9 16.3-18.2 17.8c-13.8 2.3-28 3.5-42.5 3.5s-28.7-1.2-42.5-3.5c-9.2-1.5-16.2-8.7-18.2-17.8l-12.5-57.1c-15.8-6.5-30.6-15.1-44-25.4L83.1 425.9c-8.8 2.8-18.6 .3-24.5-6.8c-8.1-9.8-15.5-20.2-22.1-31.2l-4.7-8.1c-6.1-11-11.4-22.4-15.8-34.3c-3.2-8.7-.5-18.4 6.4-24.6l43.3-39.4C64.6 273.1 64 264.6 64 256s.6-17.1 1.7-25.4L22.4 191.2c-6.9-6.2-9.6-15.9-6.4-24.6c4.4-11.9 9.7-23.3 15.8-34.3l4.7-8.1c6.6-11 14-21.4 22.1-31.2c5.9-7.2 15.7-9.6 24.5-6.8l55.7 17.7c13.4-10.3 28.2-18.9 44-25.4l12.5-57.1c2-9.1 9-16.3 18.2-17.8C227.3 1.2 241.5 0 256 0s28.7 1.2 42.5 3.5c9.2 1.5 16.2 8.7 18.2 17.8l12.5 57.1c15.8 6.5 30.6 15.1 44 25.4l55.7-17.7c8.8-2.8 18.6-.3 24.5 6.8c8.1 9.8 15.5 20.2 22.1 31.2l4.7 8.1c6.1 11 11.4 22.4 15.8 34.3zM256 336a80 80 0 1 0 0-160 80 80 0 1 0 0 160z"/></svg>';
 
   // Sign-out icon: red when signed-in (clickable), grey when not.
   // Font Awesome Classic Solid "arrow-right-from-bracket" (CC BY 4.0).
@@ -298,10 +306,12 @@ function updateHeader() {
   });
   signInBtn.innerHTML = '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512" aria-hidden="true"><path d="M352 96l64 0c17.7 0 32 14.3 32 32l0 256c0 17.7-14.3 32-32 32l-64 0c-17.7 0-32 14.3-32 32s14.3 32 32 32l64 0c53 0 96-43 96-96l0-256c0-53-43-96-96-96l-64 0c-17.7 0-32 14.3-32 32s14.3 32 32 32zm-9.4 182.6c12.5-12.5 12.5-32.8 0-45.3l-128-128c-12.5-12.5-32.8-12.5-45.3 0s-12.5 32.8 0 45.3L242.7 224 32 224c-17.7 0-32 14.3-32 32s14.3 32 32 32l210.7 0-73.4 73.4c-12.5 12.5-12.5 32.8 0 45.3s32.8 12.5 45.3 0l128-128z"/></svg>';
   if (isAuthed) signInBtn.disabled = true;
-  // Layout: sign-in on the LEFT, sign-out in the MIDDLE, settings on the RIGHT.
+  // Layout: sign-in on the LEFT, sign-out in the MIDDLE, settings (gear)
+  // on the RIGHT. (Cursor settings was repurposed into the gear icon —
+  // no second settings button needed.)
   right.appendChild(signInBtn);
   right.appendChild(signOutBtn);
-  right.appendChild(cursorSettingsBtn);
+  right.appendChild(settingsBtn);
 }
 
 // Exported so app.js (and the boot path) can call it after restoring
@@ -710,6 +720,74 @@ function renderSettings(router) {
 
   settingsSection.appendChild(assistSection);
 
+  // Statistics settings sub-section. Toggles user-facing stats UI
+  // (e.g. the checkout-statistic table in the Stats screen). Each
+  // toggle re-reads + persists the preference immediately so the
+  // Stats page picks it up on next render.
+  const statsSection = el('div', { class: 'sub-section', style: 'margin-top: 12px;' });
+  statsSection.appendChild(el('h4', { style: 'margin: 8px 0 4px; font-size: 1em; color: var(--muted); font-weight: 600; text-transform: uppercase; letter-spacing: .8px;' },
+    'Statistics settings'));
+
+  // Checkout Statistic sub-sub-section — toggle on/off whether the
+  // Stats page shows the checkout-statistic table.
+  const checkoutSub = el('div', { class: 'sub-sub-section', style: 'margin-left: 8px; margin-top: 4px;' });
+  checkoutSub.appendChild(el('h5', { style: 'margin: 6px 0 4px; font-size: 0.9em; color: var(--text); font-weight: 600; text-transform: uppercase; letter-spacing: .6px;' },
+    'Checkout Statistic'));
+  checkoutSub.appendChild(el('p', { class: 'small muted', style: 'margin: 0 0 8px;' },
+    'Show the per-player checkout success rate on the Stats page.'));
+  const toggleCheckoutStats = async (enabled) => {
+    if (enabled === null) {
+      // Clicked the already-selected option → reset to default (on).
+      await saveUiStatsSettings({ checkoutStats: true });
+      toast('Checkout Statistic on');
+      applyCheckoutStatsBtn(true);
+      return;
+    }
+    await saveUiStatsSettings({ checkoutStats: enabled });
+    toast(enabled ? 'Checkout Statistic on' : 'Checkout Statistic off');
+    applyCheckoutStatsBtn(enabled);
+  };
+  // Re-derive the On/Off segmented toggle. The currently-saved value
+  // selects which button gets the active class. The buttons are
+  // captured in `checkoutStatBtns` so `applyCheckoutStatsBtn` can
+  // imperatively update the active state.
+  const checkoutStatBtns = [];
+  const applyCheckoutStatsBtn = (val) => {
+    checkoutStatBtns.forEach((b) => {
+      const isOn = b.dataset.value === 'on';
+      b.classList.toggle('on', isOn && val);
+      b.classList.toggle('active', isOn ? val : !val);
+    });
+  };
+  const checkoutRow = (() => {
+    const wrap = el('div', { class: 'field button-row-field' });
+    wrap.appendChild(el('label', {}, 'Show Checkout Statistic'));
+    const row = el('div', { class: 'btn-row segmented' });
+    [{ value: 'on', label: 'On' }, { value: 'off', label: 'Off' }].forEach(o => {
+      const b = el('button', {
+        class: 'btn small',
+        type: 'button',
+        'data-value': o.value,
+        onclick: () => {
+          // Click on the active option again → reset to default.
+          const current = loadUiStatsSettings().checkoutStats;
+          const target = o.value === 'on';
+          toggleCheckoutStats(current === target ? null : target);
+        },
+      }, o.label);
+      checkoutStatBtns.push(b);
+      row.appendChild(b);
+    });
+    wrap.appendChild(row);
+    return wrap;
+  })();
+  // Mark the current saved value as active.
+  applyCheckoutStatsBtn(loadUiStatsSettings().checkoutStats);
+  checkoutSub.appendChild(checkoutRow);
+
+  statsSection.appendChild(checkoutSub);
+  settingsSection.appendChild(statsSection);
+
   screen.appendChild(settingsSection);
 
   // ---- About section ----
@@ -761,10 +839,8 @@ function renderMenu(router) {
   grid.appendChild(tile('Join tournament', 'Player', 'Join a competition hosted on another device. Paste the host\'s code.', () => router.go('join-tournament')));
   grid.appendChild(tile('Online Room', 'WebRTC', 'Serverless. Share a QR; opponent scans to join.', () => router.go('online')));
   grid.appendChild(tile('Stats', 'Lifetime', 'Per-game wins and best scores, stored on this device.', () => router.go('stats')));
-  // Settings tile. Always available — sign-in is optional.
-  grid.appendChild(tile('Settings', 'Admin',
-    'Sign in with Google, view app info, manage saved Client ID.',
-    () => router.go('settings')));
+  // Settings tile was moved to the header (gear icon, top-right) so
+  // it's reachable from every screen without going back to the menu.
   screen.appendChild(grid);
   return screen;
 }
@@ -1719,11 +1795,26 @@ function openHistoryEdit(idx) {
         : (game.type === 'shanghai') ? submitTurnTotalShanghai(game, total)
         : null;
     const meta = result ? {
-        darts: result.darts,
-        isLegWin: !!result.isLegWin,
-        isCheckout: !!result.isCheckout,
-        bust: !!result.bust,
+      darts: result.darts,
+      isLegWin: !!result.isLegWin,
+      isCheckout: !!result.isCheckout,
+      bust: !!result.bust,
     } : { darts: 3, isLegWin: false, isCheckout: false, bust: false };
+    // Compute the score the player was trying to close out on, BEFORE
+    // submitTurnTotal01 advances `game.current` and resets scores.
+    // For x01 this is the thrower's score going into this turn.
+    // For shanghai we use the start-of-turn score (best-effort).
+    let checkoutTarget = null;
+    if (game.type === 'x01' && result) {
+      const startScore = (game.players[game.current]?.score != null)
+        ? game.players[game.current].score
+        : null;
+      // `startScore - total` would be the post-turn score (or 0 for
+      // a finish, >0 for non-finish). The checkout target is the
+      // *pre-turn* score: how many points the player needed to
+      // clear in this turn.
+      checkoutTarget = startScore;
+    }
     game.rawDarts.push({ total, ...meta, by: throwerName });
     // A new dart invalidates the redo stack — the user threw
     // something new, so any previously-undone state is no longer
@@ -1747,7 +1838,120 @@ function openHistoryEdit(idx) {
         { type: 'match-end', winner: game.winner, by: game.players[game.winner]?.name }
       );
     }
+    // If the player just attempted to close out the leg (leg-win or
+    // bust on the last throw), prompt for the checkout-attempt count
+    // (only when the user has the Checkout Statistic setting on). The
+    // modal is non-blocking — `afterThrow` runs immediately so the UI
+    // updates with the new state, then the modal asks the question
+    // and the answer is attached to the entry we just pushed.
     afterThrow();
+    if (game.type === 'x01' && checkoutTarget != null && (meta.isLegWin || meta.bust)) {
+      // For single-in/single-out we only have the turn `total`, not
+      // the individual darts — the player could have hit any
+      // combination that sums to it. Without per-dart info we can't
+      // tell which darts were aimed at the close-out, so we always
+      // ask. For per-dart variants (DI/TI/TO/MO) the caller has
+      // already attached the darts to the entry; we read them
+      // directly so we only prompt when at least one of the thrower's
+      // darts actually had the right multiplier for the out rule.
+      const entryDarts = game.rawDarts[game.rawDarts.length - 1]?.dartsData || null;
+      if (shouldAskCheckout(game, entryDarts, meta)) {
+        maybeAskCheckoutAttempts(throwerName, checkoutTarget, meta);
+      }
+    }
+  }
+
+  // Decide whether the checkout-attempt modal should appear for this
+  // turn. The rule is: the player MUST have thrown at least one
+  // dart that could legally finish the leg under the active out
+  // rule. If every dart in the turn was a non-qualifying multiplier
+  // (e.g. all single-segment hits under Double-Out), the player
+  // couldn't possibly have been aiming at the close-out and the
+  // question would be confusing. In that case we stay silent and
+  // record nothing for the entry.
+  //
+  // `entryDarts` is the array of `{segment, multiplier}` for the
+  // just-committed turn (or null when running in single-input mode
+  // where we only have a total — there we always ask).
+  function shouldAskCheckout(game, entryDarts, meta) {
+    if (!loadUiStatsSettings().checkoutStats) return false;
+    if (game.type !== 'x01') return false;
+    if (!meta.isLegWin && !meta.bust) return false;
+    // No per-dart info → can't infer. Always ask.
+    if (!entryDarts || !entryDarts.length) return true;
+    const outRule = game.opts?.out || 'single';
+    if (outRule === 'single') return true; // any dart can finish
+    return entryDarts.some(d => {
+      const m = d?.multiplier || 1;
+      if (outRule === 'double') return m === 2;
+      if (outRule === 'triple') return m === 3;
+      if (outRule === 'master') {
+        // MO = double segment (D1–D20) OR double-bull (D25). Treble
+        // segments count only if they equal a "50" — but a treble 25
+        // is 75 and doesn't finish on MO, so we restrict to m === 2.
+        return m === 2;
+      }
+      return false;
+    });
+  }
+
+  // Prompt the user for the number of darts they attempted on the
+  // close-out. The question appears in a modal so it can't be missed
+  // but doesn't block the scoreboard update. The user enters 0 for
+  // a bust (didn't successfully close), or 1-3 for the darts that
+  // landed on the close-out combination (which is also 0 for a bust
+  // that hit a non-zero score). Setting `Checkout Statistic` to Off
+  // (Settings → Statistics) skips the prompt entirely.
+  function maybeAskCheckoutAttempts(throwerName, target, meta) {
+    if (!loadUiStatsSettings().checkoutStats) return;
+    // Compute the index of the entry we just pushed (the last one
+    // for this thrower in the current turn). The entry always lives
+    // at the tail of game.rawDarts because we just pushed it.
+    const entryIdx = game.rawDarts.length - 1;
+    if (entryIdx < 0) return;
+    const entry = game.rawDarts[entryIdx];
+    if (!entry || entry.by !== throwerName) return;
+
+    const body = el('div');
+    body.appendChild(el('p', { class: 'muted', style: 'margin-top: 0;' },
+      `${throwerName} was on ${target} and ${meta.isLegWin ? 'finished' : 'busted'}. How many darts did you throw at the close-out?`));
+    body.appendChild(el('p', { class: 'small muted', style: 'margin-top: 4px;' },
+      'Enter 0 for a bust (you didn\'t close out). Enter 1, 2 or 3 for the number of darts you aimed at the close-out — even if you missed.'));
+    const input = el('input', {
+      type: 'number',
+      class: 'input',
+      min: 0,
+      max: 3,
+      value: meta.bust ? '0' : String(Math.max(1, meta.darts || 1)),
+      style: 'width: 6em; font-size: 1.2em; text-align: center;',
+    });
+    body.appendChild(el('label', { style: 'display: block; margin-top: 8px;' }, 'Darts attempted'));
+    body.appendChild(input);
+
+    function attach() {
+      const n = Math.max(0, Math.min(3, parseInt(input.value || '0', 10) || 0));
+      const success = !!meta.isLegWin && n > 0;
+      const updated = { ...entry, checkout: { target, dartsAttempted: n, success } };
+      // Mutate in place — `game.rawDarts[entryIdx] = updated;` would
+      // break the engine's reference equality in some code paths.
+      Object.assign(entry, updated);
+      afterThrow(false);
+    }
+
+    showModal({
+      title: 'Checkout attempt',
+      body,
+      actions: [
+        { label: 'Skip', kind: 'ghost', onClick: () => { closeModal(); } },
+        { label: 'Save', kind: 'primary', onClick: () => { attach(); closeModal(); } },
+      ],
+    });
+    // Pressing Enter inside the input commits without going through
+    // the Save button (saves a click on touch devices).
+    input.addEventListener('keydown', (ev) => {
+      if (ev.key === 'Enter') { attach(); closeModal(); }
+    });
+    setTimeout(() => input.focus(), 50);
   }
 
   // X01 per-dart turn commit (for DI/TI/TO/MO variants).
@@ -1758,6 +1962,11 @@ function openHistoryEdit(idx) {
   // Capture the thrower's name BEFORE throwDarts01 advances
   // `game.current` to the next player.
   const throwerName = game.players[game.current]?.name;
+  // Capture the score the thrower was on, so we can prompt for the
+  // checkout attempt count after the throw resolves.
+  const startScore = (game.players[game.current]?.score != null)
+    ? game.players[game.current].score
+    : null;
   const result = throwDarts01(game, darts);
   const total = darts.reduce((s, d) => s + dartValue(d), 0);
   const meta = {
@@ -1781,6 +1990,13 @@ function openHistoryEdit(idx) {
     );
   }
   afterThrow();
+  // If the throw was a close-out attempt (leg-win or bust), ask
+  // how many darts were aimed at the close-out. Same modal as the
+  // single-in/single-out flow — the shared `maybeAskCheckoutAttempts`
+  // helper handles both paths.
+  if (startScore != null && (meta.isLegWin || meta.bust)) {
+    maybeAskCheckoutAttempts(throwerName, startScore, meta);
+  }
   }
 
   // Cricket: per-dart entry. Each click adds a mark segment. The turn
@@ -2038,25 +2254,37 @@ function openHistoryEdit(idx) {
   }
 
   // More commands submenu (modal panel with 6 options).
-  function showMoreCommands() {
-    const body = el('div', { class: 'cmd-list' });
-    const cmds = [
-      { key: 'undo', label: '↶ Undo last turn', desc: 'Reverse the most recent turn' },
-      { key: 'endleg', label: '🏁 End leg', desc: 'Pick the leg winner; score updates and next leg starts' },
-      { key: 'swap', label: '⇄ Exchange scores', desc: 'Swap scores (use when a player threw out of order)' },
-      { key: 'switch', label: '→ Next player', desc: 'Pass the turn without scoring' },
-      { key: 'stats', label: 'ⓘ Show stats', desc: 'Per-player score and legs won' },
-      { key: 'end', label: '⏹ End match early', desc: 'Finish the match and save stats' },
-    ];
-    for (const c of cmds) {
-      const row = el('button', { class: 'cmd-row', onclick: () => { closeModal(); runCommand(c.key); } },
-        el('div', { class: 'cmd-label' }, c.label),
-        el('div', { class: 'cmd-desc muted' }, c.desc),
-      );
-      body.appendChild(row);
+    function showMoreCommands() {
+      const body = el('div', { class: 'cmd-list' });
+      const cmds = [
+        { key: 'undo', label: '↶ Undo last turn', desc: 'Reverse the most recent turn' },
+        { key: 'endleg', label: '🏁 End leg', desc: 'Pick the leg winner; score updates and next leg starts' },
+        { key: 'swap', label: '⇄ Exchange scores', desc: 'Swap scores (use when a player threw out of order)' },
+        { key: 'switch', label: '→ Next player', desc: 'Pass the turn without scoring' },
+        { key: 'stats', label: 'ⓘ Show stats', desc: 'Per-player score and legs won' },
+        { key: 'end', label: '⏹ End match early', desc: 'Finish the match and save stats' },
+      ];
+      // Read the help-icons preference so the ⓘ icons in the more
+      // commands list honour the same setting as the rest of the app
+      // (Settings → Help icons). Defaulting to `true` mirrors the
+      // `helpIcon()` default when no preference has been stored yet.
+      const helpVisible = isHelpEnabled();
+      for (const c of cmds) {
+        // Each row: a button that runs the command on click, containing
+        // a label (with a help-icon that opens a modal explaining the
+        // command). The verbose `cmd-desc` text below the label is gone
+        // — the description is now hidden behind the ⓘ icon, matching
+        // the rest of the app's help convention.
+        const row = el('button', { class: 'cmd-row', onclick: () => { closeModal(); runCommand(c.key); } },
+          el('div', { class: 'cmd-label' },
+            el('span', {}, c.label),
+            helpIcon(c.label, c.desc, helpVisible),
+          ),
+        );
+        body.appendChild(row);
+      }
+      showModal({ title: 'More commands', body });
     }
-    showModal({ title: 'More commands', body });
-  }
   function runCommand(key) {
     switch (key) {
       case 'undo': undo(); break;

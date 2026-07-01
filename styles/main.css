@@ -104,10 +104,15 @@ input, select, textarea { font: inherit; color: inherit; cursor: inherit; }
      so they're easier to tap on the homepage. The 2.75em
      corresponds to the original 44px (16px body × 2.75 = 44px)
      and scales with the parent's font-size for consistency
-     across viewports. */
+     across viewports. `padding: 0` strips the browser's default
+     <button> padding (1px 6px) so the inner SVG fills the square
+     button edge-to-edge with no asymmetric leftover space that
+     would distort aspect-ratio-based sizing. */
   background: var(--surface-2); border: 1px solid var(--line);
   color: var(--text); width: 2.75em; height: 2.75em; border-radius: 0.625em;
+  padding: 0;
   display: inline-flex; align-items: center; justify-content: center;
+  box-sizing: border-box;
 }
 .icon-btn:hover { background: #232c3d; }
 .btn.icon-btn {
@@ -181,7 +186,23 @@ input, select, textarea { font: inherit; color: inherit; cursor: inherit; }
    1.25em / 45% sizing makes the auth icons look smaller than
    the toolbar icons even though the buttons themselves are the
    same 47px. */
-.icon-btn.auth-btn svg { width: 80%; height: 80%; fill: currentColor; }
+/* The auth SVGs (sign-in / sign-out / settings) inherit their size
+   from the button. The button itself is 2.75em square; the SVG is
+   forced to 100% of that, with a small em-based padding around the
+   edge so the icon doesn't touch the button's border. `aspect-ratio:
+   1 / 1` on the SVG keeps the inner rendering area square so the
+   gear / arrow icons aren't visually squashed by sub-pixel rounding.
+   `box-sizing: border-box` makes the padding subtract from the
+   content area rather than overflow it. */
+.icon-btn.auth-btn svg {
+  width: 100%;
+  height: 100%;
+  aspect-ratio: 1 / 1;
+  padding: 0.5em;
+  box-sizing: border-box;
+  fill: currentColor;
+  display: block;
+}
 
 /* ---------- help icon styles ---------- */
 .help-icon {

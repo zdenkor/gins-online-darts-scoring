@@ -87,3 +87,24 @@ export function saveLastGame(state) {
 export function loadLastGame() {
   return store.get('lastGame', null);
 }
+
+// =================================================================
+// UI stats settings — toggleable user preferences for the Stats page.
+// `checkoutStats` (default true) shows the checkout-statistic table in
+// the Stats screen. Settings live in localStorage under
+// `gindarts:uiStatsSettings` so they survive reloads without needing
+// the IndexedDB settings store round-trip.
+// =================================================================
+const UI_STATS_DEFAULTS = Object.freeze({ checkoutStats: true });
+
+export function loadUiStatsSettings() {
+  const raw = store.get('uiStatsSettings', null);
+  if (!raw || typeof raw !== 'object') return { ...UI_STATS_DEFAULTS };
+  return { checkoutStats: raw.checkoutStats !== false };
+}
+
+export function saveUiStatsSettings(settings) {
+  const merged = { ...UI_STATS_DEFAULTS, ...(settings || {}) };
+  store.set('uiStatsSettings', merged);
+  return merged;
+}
