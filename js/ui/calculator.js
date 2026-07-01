@@ -69,21 +69,9 @@ const ACTION_ICONS = {
   Undo:     '\u21B6',
   Redo:     '\u21B7',
   SetScore: '\uff1d',
+  Zero:     '00',
   MoreCmds: '\u22ef',
 };
-
-// SVG markup for the Zero button — two zeros side-by-side in
-// rounded squares. Width/height are 80% (set via CSS on
-// .calc-action-svg svg) so the icon scales to fill the
-// button frame along with the text-icon neighbours; the
-// viewBox keeps the 32×14 aspect ratio stable across
-// viewports.
-const ZERO_SVG = '<svg viewBox="0 0 32 14" preserveAspectRatio="xMidYMid meet" aria-hidden="true">'
-  + '<rect x="0"  y="0" width="14" height="14" rx="3" ry="3" fill="none" stroke="currentColor" stroke-width="1.5"/>'
-  + '<circle cx="7" cy="7" r="3" fill="none" stroke="currentColor" stroke-width="1.5"/>'
-  + '<rect x="18" y="0" width="14" height="14" rx="3" ry="3" fill="none" stroke="currentColor" stroke-width="1.5"/>'
-  + '<circle cx="25" cy="7" r="3" fill="none" stroke="currentColor" stroke-width="1.5"/>'
-  + '</svg>';
 
 export function renderCalculator({
   onCommit,
@@ -106,28 +94,21 @@ export function renderCalculator({
   root.appendChild(display);
 
   // Half-height action row: 5 icon-only buttons.
-  // (Undo, Redo, SetScore, Zero, MoreCmds). Each is a fifth
-  // the width of a numpad row (full width split 5 ways), half the
-  // height. Undo sits in the leftmost position (the same slot
-  // the old Exit button used to occupy) so its placement is
-  // consistent with the per-turn command area. Redo is the
-  // immediate right of Undo. Zero is the "BUST / no score"
-  // quick-action, sits between SetScore and MoreCmds.
+  // (Undo, Redo, SetScore, Zero, MoreCmds). Each is sized to
+  // half the height of a numpad tile. Undo sits in the
+  // leftmost position (the same slot the old Exit button used
+  // to occupy) so its placement is consistent with the
+  // per-turn command area. Redo is the immediate right of
+  // Undo. Zero is the "BUST / no score" quick-action, sits
+  // between SetScore and MoreCmds.
   const actions = el('div', { class: 'calc-actions' });
   for (const key of ['Undo', 'Redo', 'SetScore', 'Zero', 'MoreCmds']) {
-    const isSvg = key === 'Zero';
     const btn = el('button', {
-      class: 'calc-action-btn calc-action-' + key.toLowerCase()
-        + (isSvg ? ' calc-action-svg' : ''),
+      class: 'calc-action-btn calc-action-' + key.toLowerCase(),
       'aria-label': ariaLabelFor(key),
       title: ariaLabelFor(key),
       onclick: () => handleAction(key),
-    });
-    if (isSvg) {
-      btn.innerHTML = ZERO_SVG;
-    } else {
-      btn.textContent = ACTION_ICONS[key];
-    }
+    }, ACTION_ICONS[key]);
     actions.appendChild(btn);
   }
   root.appendChild(actions);
