@@ -1607,6 +1607,37 @@ function openHistoryEdit(idx) {
       {
         meta.appendChild(el('div', {}, 'Legs:', el('strong', {}, String(legsToWin))));
       }
+      // Live match status — only when at least one of sets/legs
+      // is multi (>1). Format:
+      //   sets > 1, legs > 1 → "3:2 (2:1)"   sets.setsWon : sets.legsWon
+      //                            (legs in current set in parens)
+      //   sets === 1, legs > 1 → "(2:1)"    legs only
+      //   sets > 1, legs === 1 → "3:2"      sets only
+      //   both 1 → not rendered
+      // P1's count is on the left of the colon, P2 on the right
+      // (mirrors the player-card left-to-right layout).
+      // Font is 80% of the surrounding meta items so it reads
+      // as a status line, not a primary label.
+      if ((setsToWin || 1) > 1 || (legsToWin || 1) > 1) {
+        const p1 = game.players[0];
+        const p2 = game.players[1];
+        if (p1 && p2) {
+          let status = '';
+          if ((setsToWin || 1) > 1) {
+            status += `${p1.setsWon || 0}:${p2.setsWon || 0}`;
+          }
+          if ((legsToWin || 1) > 1) {
+            status += ` (${p1.legsWon || 0}:${p2.legsWon || 0})`;
+          }
+          if (status) {
+            const statusEl = el('div',
+              { class: 'match-status-row',
+                title: 'Current match status — sets (legs in current set)' },
+              status);
+            meta.appendChild(statusEl);
+          }
+        }
+      }
       // Mode label: e.g. "501", or "501 · DI/DO" when in/out rules are set.
       // Single in/out are omitted (anything goes → not worth printing).
       const inLabel = game.opts.in !== 'single' ? X01_IN_OPTIONS[game.opts.in]?.label : '';

@@ -666,6 +666,19 @@ select.input option, select.dropdown-readable option {
   overflow: hidden;
   text-overflow: ellipsis;
 }
+/* Live match status (e.g. "3:2 (2:1)"). Sits at the end of
+   the meta row, just before the toolbar's right-side icons
+   (fullscreen, exit). Font is 80% of the surrounding meta
+   items so it reads as a status line, not a primary label.
+   `font-variant-numeric: tabular-nums` keeps the digits
+   monospaced so the "1" / "2" / "3" don't shift width
+   as the count changes. */
+.game-toolbar .meta .match-status-row {
+  font-size: 0.8em;
+  font-variant-numeric: tabular-nums;
+  font-weight: 600;
+  color: var(--text);
+}
 .game-toolbar .meta strong {
   color: var(--text);
   font-size: 1.9vh;
