@@ -1999,7 +1999,8 @@ function openHistoryEdit(idx) {
       : optimalBudget === 2 ? '2 darts'
       : '3 darts';
     const helpText = `Tap the number of darts you had available for the close-out. `
-      + `0 = bust (you didn't check out). 1, 2 or 3 = the maximum dart count the rules allow for a close-out this turn — you must have had at least that many darts in hand to attempt the finish. `
+      + `0 = bust (you didn't check out) — only enabled on a non-leg-win turn. On a leg-win the 0 button is disabled because closing the leg requires at least one dart to land on the target, so a successful checkout cannot be "zero darts". `
+      + `1, 2 or 3 = the maximum dart count the rules allow for a close-out this turn — you must have had at least that many darts in hand to attempt the finish. `
       + `The target (${target}) is closable in ${optimalLabel} on ${(inOut.out || 'double').toUpperCase()}, so only the optimal buttons are enabled — counts below ${optimalLabel} are physically impossible (1 dart can't produce 81 on Double Out), and counts above the available maximum are wasteful. `
       + `On a leg-win the maximum is the budget of your actual finish (3 for a 1-dart, 2 for a 2-dart, 1 for a 3-dart).`;
     body.appendChild(el('p', { class: 'muted', style: 'margin-top: 0;' },
@@ -2018,9 +2019,20 @@ function openHistoryEdit(idx) {
     const btnRow = el('div', { class: 'btn-row segmented checkout-dart-row' });
     const buttons = {};
     [0, 1, 2, 3].forEach((n) => {
-      // n=0 is always enabled (bust). n=1/2/3 are enabled
-      // IFF n <= max (the Excel rule).
-      const isEnabled = (n === 0) || n <= max;
+      // n=0 is the BUST button. It is enabled only on a
+      // non-leg-win turn (the player could have missed the
+      // close-out). On a leg-win, the player MUST have
+      // thrown at least one dart to land exactly on the
+      // target, so button 0 is disabled — there is no
+      // scenario where a successful checkout counts as
+      // "zero checkout attempts". Buttons 1/2/3 are enabled
+      // IFF n <= max (the Excel rule). The optimal count and
+      // below are physically possible; the rest above max
+      // are wasteful.
+      const isBustButton = (n === 0);
+      const isEnabled = isBustButton
+        ? !meta.isLegWin
+        : n <= max;
       const b = el('button', {
         type: 'button',
         class: 'btn segmented-btn'
