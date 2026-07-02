@@ -1170,12 +1170,22 @@ function renderGame(router, params) {
     // Shared history strip — lives between the toolbar (above) and the
     // scoreboard (below) as a full-width row. `let` so render() can
     // replace it with a fresh element after every throw.
-    // For Cricket, render the cricket-specific scorecard TABLE instead
-    // (per-player marks per cricket target, dart-count column, etc.).
-    let sharedHistory = game.type === 'cricket'
-      ? renderCricketScorecard()
-      : renderSharedHistory();
-    screen.appendChild(sharedHistory);
+    //
+    // For Cricket, the X01 shared history doesn't apply (cricket
+    // has no per-round "scored / to go" — it has marks per
+    // segment). renderCricketScorecard() was a stand-in that
+    // showed a marks-by-segment table the same way as the
+    // standalone Stats screen; it lived between the toolbar and
+    // the player cards. Hide it as well — the player cards
+    // already show each player's score, and the dartpad shows
+    // the per-segment marks as you tap them. The standalone
+    // cricket scorecard is still available via the History
+    // button on the end-of-match modal.
+    let sharedHistory = null;
+    if (game.type !== 'cricket') {
+      sharedHistory = renderSharedHistory();
+      screen.appendChild(sharedHistory);
+    }
 
     // Scoreboard — two player cards side-by-side now that the shared
     // history has been hoisted out of the middle column.
@@ -1991,9 +2001,13 @@ function openHistoryEdit(idx) {
             || oldList.scrollHeight - oldList.scrollTop - oldList.clientHeight < 20;
           const preservedScrollTop = oldList ? oldList.scrollTop : 0;
 
-          const fresh = game.type === 'cricket'
-            ? renderCricketScorecard()
-            : renderSharedHistory();
+          // The cricket scorecard used to be re-rendered here for
+          // cricket games, but the scorecard was removed from the
+          // game screen in v0.6.x (see the screen-build code that
+          // sets sharedHistory = null for cricket). The guard above
+          // skips this block for cricket (sharedHistory is null),
+          // so we always re-render the X01 shared history here.
+          const fresh = renderSharedHistory();
           sharedHistory.replaceWith(fresh);
           sharedHistory = fresh;
 
