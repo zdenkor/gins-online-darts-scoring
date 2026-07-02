@@ -1066,8 +1066,13 @@ select.input option, select.dropdown-readable option {
   display: flex;
   flex-direction: column;
   gap: 6px;
-  width: 100%;
-  max-width: 320px;
+  /* Fill 75% of the calcHost's width (= 75% of the game screen's
+     middle column, which is the parent). The dartpad is the user's
+     primary input on the cricket screen — making the buttons bigger
+     improves tap accuracy on touch. The previous max-width: 320px
+     forced the pad to a fixed width on every viewport, which was
+     readable on a phone but cramped on a tablet / desktop. */
+  width: 75%;
   margin: 0 auto;
 }
 .cricket-dartpad-row {
