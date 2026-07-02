@@ -1062,6 +1062,14 @@ select.input option, select.dropdown-readable option {
    rows — important on narrow screens where the pad is the user's
    primary input.
    ================================================================= */
+/* Cricket action bar — 4 columns (Undo, Redo, MoreCmds, Next ▶)
+   instead of the X01 calculator's 5. SetScore and Zero are X01-only
+   and don't apply to cricket (they touch player.score / push a
+   0-total entry, which is meaningless for cricket's marks-based
+   scoring), so the cricket row drops them. */
+.calc-actions.cricket-actions {
+  grid-template-columns: 1fr 1fr 1fr 1fr;
+}
 .cricket-dartpad {
   display: flex;
   flex-direction: column;

@@ -2119,10 +2119,29 @@ function openHistoryEdit(idx) {
     // applies repeated entries as multiple marks, so [20, 20, 20]
     // is a T20, [25, 25] is a double bull (= 2 marks), etc.
     if (game.type === 'cricket') {
+      // Action bar — 4 icon-only buttons (Undo, Redo, MoreCmds,
+      // Next ▶). Mirrors the X01 calculator's action row (which
+      // has 5: Undo, Redo, SetScore, Zero, MoreCmds) but drops
+      // SetScore and Zero — those are X01-only (SetScore writes
+      // to player.score and pushes { total: 0, override: value }
+      // into rawDarts, which is meaningless for cricket's
+      // marks-based scoring). Next ▶ moves here from the bottom
+      // of the dartpad so the action bar is the single home for
+      // turn-level commands (Undo, Redo, end turn, etc.) and
+      // the dartpad is purely the per-dart segment picker.
+      const actions = el('div', { class: 'calc-actions cricket-actions' });
+      actions.appendChild(el('button', { class: 'calc-action-btn calc-action-undo',     title: 'Undo last dart',           onclick: undo },             '\u21B6'));
+      actions.appendChild(el('button', { class: 'calc-action-btn calc-action-redo',     title: 'Redo last undone dart',   onclick: redo },             '\u21B7'));
+      actions.appendChild(el('button', { class: 'calc-action-btn calc-action-morecmds', title: 'More commands',           onclick: showMoreCommands }, '\u22ef'));
+      actions.appendChild(el('button', { class: 'calc-action-btn calc-action-next',     title: 'End turn',                onclick: endCricketTurn },  'Next \u25B6'));
+      calcHost.appendChild(actions);
+
       // cricket-grid: 3 columns (T/D/S), one row per segment from
       // 20 down to 15, plus a bull row at the top (25/50 — there's
-      // no triple bull in cricket) and a MISS/Next row at the
-      // bottom. Buttons use the shared .btn class for the visual
+      // no triple bull in cricket). The Next ▶ button used to sit
+      // in its own row at the bottom; it moved to the action bar
+      // above so the dartpad is purely the per-dart segment
+      // picker. Buttons use the shared .btn class for the visual
       // style; T buttons get a ghost-variant accent so the three
       // columns are visually distinct.
       const grid = el('div', { class: 'cricket-dartpad' });
@@ -2146,13 +2165,6 @@ function openHistoryEdit(idx) {
         row.appendChild(el('button', { class: 'btn',        title: `Single ${n} (1 mark)`,  onclick: () => commitCricketDart(n, 1) }, `${n}`));
         grid.appendChild(row);
       }
-
-      // Next ▶ button — ends the turn early. Centered on its own
-      // row, same width as one dart-pad cell so it lines up with
-      // the column grid above.
-      const nextRow = el('div', { class: 'cricket-dartpad-row cricket-dartpad-next' });
-      nextRow.appendChild(el('button', { class: 'btn primary', title: 'End turn', onclick: endCricketTurn }, 'Next ▶'));
-      grid.appendChild(nextRow);
 
       calcHost.appendChild(grid);
     }
