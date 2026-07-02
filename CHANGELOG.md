@@ -4,6 +4,82 @@ All notable changes to Gin's Online Dart's Scoring System are documented here.
 Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 Versions follow [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.6.3] - 2026-07-02
+
+### Fixed
+- **End-of-match panel did not appear after a match end.** The
+  `afterThrow()` function auto-called `endMatch()` (which routes
+  to the menu) immediately after `render()` painted the panel,
+  so the user never saw it. The panel is the user's only chance
+  to see the final score / open History / open Stats / finish
+  the match — it must stay on screen until the user explicitly
+  presses Finish. Removed the auto-`endMatch()` call.
+- **Checkout-attempts prompt stopped firing on multi-leg leg-wins.**
+  The `maybeAskCheckoutAttempts()` guard `if (game.winner != null)`
+  (added when the end-of-match popup moved to a modal) was too
+  broad: it suppressed the prompt for every leg after the first
+  in a multi-leg match, because `doEndLeg()` (the manual "End leg"
+  command) sets `game.winner` to the leading player even when
+  the match continues. The match-end path is already gated by
+  the `if (game.winner != null) return;` at the top of
+  `commitTurnTotal()`, so the inner guard is redundant for
+  match-end and harmful for multi-leg leg-wins. Removed.
+
+### Changed
+- **End-of-match popup is now a modal** (same look as the
+  Save/Exit dialog that opens from the toolbar's Exit button),
+  not a card at the bottom of the game screen. The user asked
+  for "ako ked das exit tlacitko". This required three
+  coordinated changes:
+  1. `js/util/helpers.js` — `showModal()` now PUSHES onto a
+     stack instead of closing any prior modal. `closeModal()`
+     pops the topmost. `closeAllModals()` empties the stack.
+     Escape / backdrop-click only close the topmost
+     dismissable modal. A new `dismissable: false` option
+     opts a modal out of backdrop + Escape dismissal (the
+     end-of-match popup uses this so the user must press
+     History / Stats / Finish explicitly).
+  2. `js/ui/screens.js` — `showEndOfMatchModal()` replaces
+     `buildEndOfMatchPanel()`. The popup is shown via
+     `showModal()` with `dismissable: false` and three
+     action buttons. History / Stats action buttons carry
+     `keepOpen: true` so the modal wrapper's default
+     "close-after-onclick" doesn't pop the sub-modal they
+     immediately push. The History/Stats sub-modals also
+     carry `keepOpen: true` on their Close buttons for the
+     same reason.
+  3. `js/ui/screens.js` — `endMatch()` calls `closeAllModals()`
+     before `recordGameResult()` so no orphan modals leak
+     into the next screen.
+- **End-of-match final-score font is now 1.5em** (was the
+  default 15px in `.modal-body`). The score text
+  ("Final: Gin 1 · Alex 0") is wrapped in
+  `<div class="eom-score-text">` so the bump doesn't affect
+  the default `.modal-body` sizing other modals (Save game,
+  Exit, etc.) rely on. Implemented in `em`, not `px`, so it
+  scales with the user's font-size preferences and the
+  surrounding modal width.
+- **End-of-match Stats modal now mirrors the full Stats screen
+  layout** (Averages, High Turns, Checkouts, Legs, Throwing
+  Order, Totals — 6 sections + 30 data rows) instead of the
+  previous 10 hand-picked metrics. The user asked for
+  "statistics ako mame celkovu statistiku pre hracov, ale
+  len pre aktualny match". Section headers span the full
+  table width and use a muted/uppercase look. The
+  `openEndStatsModal()` function now also normalizes
+  `entry.players` to a `string[]` before handing it to
+  `computeStats` — a real-data bug fix: `walkGame` (in
+  `js/game/stats.js`) builds per-player buckets by using
+  each entry of `entry.players` as an Object key, so
+  passing in the raw player objects from `game.players`
+  (which have `{name, score, legsWon, ...}`) collapsed
+  every player into a single `"[object Object]"` key and
+  every stat came out as 0. The global Stats screen
+  avoided this because its test fixtures use string
+  arrays; real game objects (built by `new01` in
+  `engine.js`) are player objects, and need this
+  normalization at the call site.
+
 ## [0.6.2] - 2026-07-02
 
 ### Added
