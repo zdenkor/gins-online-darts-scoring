@@ -4,6 +4,51 @@ All notable changes to Gin's Online Dart's Scoring System are documented here.
 Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 Versions follow [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.6.4] - 2026-07-02
+
+### Changed
+- **Cricket calc: full per-dart grid (T20-D20-20 … T15-D15-15,
+  25/50, MISS, Next)**. The cricket game screen used to show a
+  small row of single-mark buttons (7 segments + MISS + Next)
+  and required the user to tap the same number 3 or 2 times
+  in a row to record a T or D. That was painful on a tablet.
+  Replaced the pad with a 3-column grid: bull row at the top
+  (MISS, 25 = single bull, 50 = double bull), then one row
+  per cricket number 20 down to 15 with T/D/S columns. Each
+  T/D/S tap pushes 3/2/1 mark(s) of the segment into
+  game.cricketDarts; the engine applies repeated entries as
+  multiple marks. Implementation: commitCricketDart() in
+  screens.js now takes a `marks` parameter, the dartpad grid
+  in renderGame() builds 7 rows (1 bull + 6 numbers) with
+  explicit per-button labels and titles, and CSS in
+  styles/main.css adds a `.cricket-dartpad` rule (3-column
+  grid per row, em-based sizes for the button height /
+  padding). em, not px.
+- **Cricket screen now has an action bar** (Undo, Redo,
+  MoreCmds, Next ▶) above the dartpad. Mirrors the X01
+  calculator's action row but drops SetScore and Zero (both
+  are X01-only — they touch player.score and push a 0-total
+  entry into rawDarts, which is meaningless for cricket's
+  marks-based scoring). The Next ▶ button moved from the
+  bottom row of the dartpad to the rightmost slot of the
+  action bar so the bar is the single home for turn-level
+  commands and the dartpad is purely the per-dart segment
+  picker. The X01 calc has 5 columns; cricket has 4 (no
+  SetScore, no Zero). Shared CSS via `.calc-action-btn`.
+- **Cricket screen no longer shows the X01 calculator or the
+  per-segment scorecard**. Previously the X01 numpad lived
+  below the cricket dartpad (dead weight — cricket doesn't
+  use a numeric buffer) and a marks-by-segment table lived
+  between the toolbar and the player cards (duplicated info
+  already visible on the dartpad). Both are now hidden.
+  Cricket's game screen is now: toolbar (top), player cards
+  (left/right), action bar, dartpad (middle column).
+- **Cricket dartpad is now 75% wide × ~75% tall**. Was
+  capped at 320px wide and 44px-tall buttons; now
+  75% × 9vh-per-row so it scales with the viewport
+  (button touch targets went from ~106×44 to ~312×81 on a
+  1264-wide viewport, ~3× larger).
+
 ## [0.6.3] - 2026-07-02
 
 ### Fixed
