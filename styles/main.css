@@ -1082,11 +1082,14 @@ select.input option, select.dropdown-readable option {
 }
 .cricket-dartpad-row > .btn {
   /* Buttons share the .btn class, but their text (T20, D20, 20, 50, …)
-     is longer than the X01 numpad digits. Use a slightly smaller min
-     height than the numpad so the pad doesn't push the screen too
-     tall on small viewports. Font-size follows the .btn defaults
-     and the .calc-hint class doesn't apply here. */
-  min-height: 2.6em;
+     is longer than the X01 numpad digits. Use a viewport-based
+     min-height (9vh) so the dartpad fills ~75% of the screen —
+     8 × 9vh ≈ 72vh of button height plus 7 × 6px gaps (≈ 5vh on
+     a 900px viewport) lands near 75% of the viewport. vh keeps
+     the pad in proportion to the screen, not the surrounding
+     font-size, so it doesn't grow into a giant block on a large
+     desktop. */
+  min-height: 9vh;
   padding: 0.4em 0.6em;
   font-weight: 600;
 }
@@ -1096,7 +1099,9 @@ select.input option, select.dropdown-readable option {
   grid-template-columns: 1fr;
 }
 .cricket-dartpad-row.cricket-dartpad-next > .btn {
-  min-height: 2.8em;
+  /* A touch taller than the segment rows so the "end turn"
+     affordance stands out. 10vh instead of 9vh. */
+  min-height: 10vh;
 }
 .player-card {
   background: var(--surface); border: 1px solid var(--line); border-radius: var(--radius);
