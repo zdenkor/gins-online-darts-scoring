@@ -76,17 +76,37 @@ export function formatDuration(ms) {
 // Modal dialog helpers — used for confirmations and the More Commands
 // submenu. showModal returns a close() function. Closes on backdrop
 // click or Escape key.
+//
+// Stack semantics (v0.6.2+): showModal pushes onto a stack rather
+// than closing any prior modal. This lets a sub-modal (e.g. History /
+// Stats opened from the end-of-match panel) layer on top, and the
+// parent modal comes back when the child closes. The Escape key and
+// backdrop click close ONLY the topmost modal — the parent's
+// listeners are re-attached when it becomes top again.
+//
+// `dismissable: false` on a modal opts it out of backdrop + Escape
+// dismissal (used for the end-of-match panel, where the user must
+// pick Finish / History / Stats explicitly).
 // =================================================================
-let _openModal = null;
-function dismissOnBackdrop(e) {
-  if (e.target === e.currentTarget) closeModal();
+let _modalStack = []; // each entry: { backdrop, onKey, dismissable }
+
+function _dismissOnBackdrop(e) {
+  if (e.target !== e.currentTarget) return;
+  if (!_modalStack.length) return;
+  const top = _modalStack[_modalStack.length - 1];
+  if (top.dismissable === false) return;
+  closeModal();
 }
-function dismissOnKey(e) {
-  if (e.key === 'Escape') closeModal();
+function _dismissOnKey(e) {
+  if (e.key !== 'Escape') return;
+  if (!_modalStack.length) return;
+  const top = _modalStack[_modalStack.length - 1];
+  if (top.dismissable === false) return;
+  closeModal();
 }
-export function showModal({ title = '', body = '', actions = [] } = {}) {
-  closeModal(); // only one modal at a time
-  const backdrop = el('div', { class: 'modal-backdrop', onclick: dismissOnBackdrop, role: 'dialog', 'aria-modal': 'true' });
+
+export function showModal({ title = '', body = '', actions = [], dismissable = true } = {}) {
+  const backdrop = el('div', { class: 'modal-backdrop', onclick: _dismissOnBackdrop, role: 'dialog', 'aria-modal': 'true' });
   const panel = el('div', { class: 'modal-panel' });
   if (title) panel.appendChild(el('h3', { class: 'modal-title' }, title));
   if (body) {
@@ -111,8 +131,19 @@ export function showModal({ title = '', body = '', actions = [] } = {}) {
   panel.appendChild(actionRow);
   backdrop.appendChild(panel);
   document.body.appendChild(backdrop);
-  document.addEventListener('keydown', dismissOnKey);
-  _openModal = backdrop;
+
+  // Detach the previous modal's keydown listener (if any) and
+  // attach our own — the listener always acts on the top of the
+  // stack, so only the topmost modal can be dismissed by key.
+  if (_modalStack.length) {
+    const prev = _modalStack[_modalStack.length - 1];
+    document.removeEventListener('keydown', prev.onKey);
+  }
+  document.addEventListener('keydown', _dismissOnKey);
+
+  const entry = { backdrop, onKey: _dismissOnKey, dismissable };
+  _modalStack.push(entry);
+
   // Focus the first button so Enter confirms
   setTimeout(() => {
     const firstBtn = actionRow.querySelector('button');
@@ -347,11 +378,23 @@ export function toggleRow(label, options, selected, onChange) {
 }
 
 export function closeModal() {
-  if (_openModal) {
-    _openModal.remove();
-    _openModal = null;
-    document.removeEventListener('keydown', dismissOnKey);
+  if (!_modalStack.length) return;
+  const top = _modalStack.pop();
+  top.backdrop.remove();
+  document.removeEventListener('keydown', top.onKey);
+  // If there's a parent modal underneath, re-attach its keydown
+  // listener so Escape / arrow keys can dismiss it.
+  if (_modalStack.length) {
+    const parent = _modalStack[_modalStack.length - 1];
+    document.addEventListener('keydown', parent.onKey);
   }
+}
+
+// Close every modal on the stack, in top-down order. Use when
+// leaving a screen (e.g. router.go() in endMatch) so no orphan
+// modal stays attached to a screen that's about to be replaced.
+export function closeAllModals() {
+  while (_modalStack.length) closeModal();
 }
 
 // =================================================================

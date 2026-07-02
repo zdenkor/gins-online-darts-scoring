@@ -3,7 +3,7 @@
 // competitions / admin screens. No framework.
 // =================================================================
 
-import { el, toast, copyToClipboard, formatDuration, showModal, closeModal, buttonRow, capButtonRow, toggleRow, x01GameOptionsControls, fullscreenButton } from '../util/helpers.js';
+import { el, toast, copyToClipboard, formatDuration, showModal, closeModal, closeAllModals, buttonRow, capButtonRow, toggleRow, x01GameOptionsControls, fullscreenButton } from '../util/helpers.js';
 import { enableDebugOverlay, disableDebugOverlay, isDebugOverlayOn } from '../util/debug-overlay.js';
 import { store, getStats, saveLastGame, recordGameResult, loadLastGame, getGameHistory, loadUiStatsSettings, saveUiStatsSettings } from '../util/store.js';
 import { HostRoom, GuestRoom } from '../net/rtc.js';
@@ -1603,36 +1603,67 @@ function openHistoryEdit(idx) {
   // without losing the visual context of the finished game.
   // ----------------------------------------------------------------
 
-  // Build the end-of-match panel that sits in calcHost. Renders the
-  // trophy line, the final score row, and the three action buttons.
-  function buildEndOfMatchPanel() {
+  // Show the end-of-match popup. Renders the trophy line, the final
+  // score row, and the three action buttons via showModal() — same
+  // look as the Save/Exit dialog that appears when the user hits
+  // the toolbar's Exit button. No-op when the popup is already on
+  // top of the modal stack (so re-render calls after a History /
+  // Stats sub-modal closes don't stack duplicate panels).
+  function showEndOfMatchModal() {
+    // Skip if the end-of-match popup is already the topmost modal.
+    // The stack is internal to helpers.js; we can't read it
+    // directly, but a fresh `aria-modal` whose first <h3> matches
+    // our title is a reliable fingerprint. Cheaper alternative:
+    // look for any `.modal-panel` whose `.modal-title` text starts
+    // with 🏆.
+    if (isEndOfMatchOpen()) return;
+
     const wIdx = game.winner;
     const wName = game.players[wIdx]?.name || '?';
-    const card = el('div', { class: 'card end-of-match', style: 'text-align:center' });
-
-    // Trophy / winner line — same wording as the original card so
-    // muscle-memory carries over.
-    card.appendChild(el('h2', { style: 'margin:0 0 4px' }, `🏆 ${wName} wins the match!`));
 
     // Final score row. For multi-set matches, show sets and legs;
-    // for single-set matches, just legs. The format mirrors the
-    // pre-existing winner card's "Final: X" line.
+    // for single-set matches, just legs.
     const setsToWin = game.opts?.setsToWin || 1;
     const scoreText = setsToWin > 1
       ? game.players.map(p => `${p.name} ${p.setsWon || 0} sets · ${p.legsWon || 0} legs`).join(' · ')
       : 'Final: ' + game.players.map(p => `${p.name} ${p.legsWon || 0}`).join(' · ');
-    card.appendChild(el('div', { class: 'muted eom-score' }, scoreText));
 
-    // Three action buttons: History, Stats, Finish. Equal width via
-    // flex on the row. Primary styling on Finish since it's the
-    // "leave the game" affordance the user is most likely to want.
-    const btnRow = el('div', { class: 'btn-row eom-buttons', style: 'margin-top:14px' });
-    btnRow.appendChild(el('button', { class: 'btn ghost', onclick: openEndHistoryModal }, 'History'));
-    btnRow.appendChild(el('button', { class: 'btn ghost', onclick: openEndStatsModal }, 'Stats'));
-    btnRow.appendChild(el('button', { class: 'btn primary', onclick: endMatch }, 'Finish'));
-    card.appendChild(btnRow);
+    showModal({
+      title: `🏆 ${wName} wins the match!`,
+      body: scoreText,
+      // `dismissable: false` opts out of backdrop-click and Escape
+      // dismissal — the user must pick History / Stats / Finish
+      // explicitly (matches the v0.6.2 product spec for the
+      // end-of-match popup).
+      dismissable: false,
+      actions: [
+        // History and Stats open a sub-modal that pushes on top of
+        // the popup. `keepOpen: true` prevents showModal's default
+        // "close after onclick" behaviour from immediately popping
+        // the sub-modal we just opened. Finish calls endMatch which
+        // calls closeAllModals, so it doesn't need keepOpen — and
+        // we don't want it, because the modal's own close-after-
+        // onclick behaviour is exactly what we want (modal is
+        // closed before the router.go() navigation).
+        { label: 'History', class: 'btn ghost', onclick: openEndHistoryModal, keepOpen: true },
+        { label: 'Stats',   class: 'btn ghost', onclick: openEndStatsModal,   keepOpen: true },
+        { label: 'Finish',  class: 'btn primary', onclick: endMatch },
+      ],
+    });
+  }
 
-    return card;
+  // Detect whether the end-of-match popup is currently shown. We
+  // scan the DOM for any visible modal whose title starts with the
+  // trophy emoji — that's the same string we pass as `title` above,
+  // and it's a unique-enough marker (no other modal uses 🏆).
+  function isEndOfMatchOpen() {
+    const panels = document.querySelectorAll('.modal-panel');
+    for (const p of panels) {
+      if (p.offsetParent === null) continue; // hidden
+      const t = p.querySelector('.modal-title');
+      if (t && t.textContent.startsWith('🏆')) return true;
+    }
+    return false;
   }
 
   // History modal — opens a chronological table of all turns in the
@@ -1644,7 +1675,10 @@ function openHistoryEdit(idx) {
 
     if (game.players.length < 2) {
       body.appendChild(el('p', { class: 'muted' }, 'Match history (single-player game).'));
-      showModal({ title: 'Match history', body, actions: [{ label: 'Close', onclick: closeModal }] });
+      // `keepOpen: true` so the modal wrapper's "close after onclick"
+      // doesn't pop the end-of-match popup underneath us when the
+      // user dismisses this sub-modal.
+      showModal({ title: 'Match history', body, actions: [{ label: 'Close', onclick: closeModal, keepOpen: true }] });
       return;
     }
 
@@ -1710,7 +1744,7 @@ function openHistoryEdit(idx) {
       });
     }
 
-    showModal({ title: 'Match history', body, actions: [{ label: 'Close', onclick: closeModal }] });
+    showModal({ title: 'Match history', body, actions: [{ label: 'Close', onclick: closeModal, keepOpen: true }] });
   }
 
   // Stats modal — per-player summary table for the finished match.
@@ -1722,7 +1756,7 @@ function openHistoryEdit(idx) {
     const players = game.players || [];
     if (players.length < 2) {
       body.appendChild(el('p', { class: 'muted' }, 'No stats (single-player game).'));
-      showModal({ title: 'Match stats', body, actions: [{ label: 'Close', onclick: closeModal }] });
+      showModal({ title: 'Match stats', body, actions: [{ label: 'Close', onclick: closeModal, keepOpen: true }] });
       return;
     }
     // Synthetic history = this one game, scoped as 'standalone' so the
@@ -1787,7 +1821,7 @@ function openHistoryEdit(idx) {
     body.appendChild(el('p', { class: 'muted', style: 'margin-top:8px; font-size:0.9em' },
       'Stats are scoped to this match only.'));
 
-    showModal({ title: 'Match stats', body, actions: [{ label: 'Close', onclick: closeModal }] });
+    showModal({ title: 'Match stats', body, actions: [{ label: 'Close', onclick: closeModal, keepOpen: true }] });
   }
 
   function render() {
@@ -1920,12 +1954,26 @@ function openHistoryEdit(idx) {
       });
     }
 
-    // Calculator or end-of-match panel
+    // Calculator or end-of-match popup
     calcHost.innerHTML = '';
     if (game.winner != null) {
-      // End-of-match: show the final score and three buttons
-      // (History, Stats, Finish) — see buildEndOfMatchPanel().
-      calcHost.appendChild(buildEndOfMatchPanel());
+      // End-of-match: show a modal popup with the final score and
+      // three buttons (History, Stats, Finish). Rendered via the
+      // shared showModal() helper (same look as the Save/Exit
+      // dialog) so it sits on top of the game screen. showEndOfMatchModal
+      // is a no-op when the panel is already open, so re-render
+      // calls (e.g. after a History/Stats sub-modal closes) don't
+      // stack duplicate panels.
+      //
+      // If a checkout-attempts modal is still on the stack from the
+      // leg-winning turn, close it first so it doesn't sit on top of
+      // (or behind) the end-of-match popup and block the user from
+      // clicking the action buttons. Only do this on the first time
+      // the end-of-match popup appears — when the popup is already
+      // open, leave the stack alone so a History/Stats sub-modal
+      // can stay on top.
+      if (!isEndOfMatchOpen()) closeModal();
+      showEndOfMatchModal();
       return;
     }
     // Compute running leg total for the current player (sum of recent turns since last bust)
@@ -2079,7 +2127,9 @@ function openHistoryEdit(idx) {
     // modal is non-blocking — `afterThrow` runs immediately so
     // the UI updates with the new state, then the modal asks the
     // question and the answer is attached to the entry we just
-    // pushed.
+    // pushed. The match-end guard is inside maybeAskCheckoutAttempts
+    // — on a leg-winning turn the prompt is skipped so it doesn't
+    // sit on top of the end-of-match popup.
     afterThrow();
     if (game.type === 'x01' && checkoutTarget != null) {
       // For single-in/single-out we only have the turn `total`, not
@@ -2181,6 +2231,10 @@ function openHistoryEdit(idx) {
   // to Off (Settings → Statistics) skips the prompt entirely.
   function maybeAskCheckoutAttempts(throwerName, target, meta) {
     if (!loadUiStatsSettings().checkoutStats) return;
+    // If the match is already over, the end-of-match popup is on
+    // screen and a checkout-attempts prompt would just sit on top
+    // of it, intercepting clicks on History/Stats/Finish. Skip.
+    if (game.winner != null) return;
     // Compute the index of the entry we just pushed (the last one
     // for this thrower in the current turn). The entry always lives
     // at the tail of game.rawDarts because we just pushed it.
@@ -2800,6 +2854,13 @@ function openHistoryEdit(idx) {
   }
 
   function endMatch() {
+    // Close every modal on the stack (end-of-match popup, any
+    // History/Stats sub-modal still on top, plus any leftover
+    // checkout-attempts modal). We're about to leave the game
+    // screen, so leaving any of them attached to the document is
+    // an orphan — the next screen would render underneath an
+    // invisible modal backdrop.
+    closeAllModals();
     recordGameResult(game);
     saveLastGame({ ...game, rawDarts: game.rawDarts.slice(-50) });
     window.removeEventListener('gindarts:game-state-changed', stateChangeHandler);
