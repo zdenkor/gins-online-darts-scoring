@@ -2733,43 +2733,12 @@ function renderPlayerCard(player, idx, game, onClick) {
     isWinner ? el('span', { class: 'badge-active' }, 'Winner') : null,
   ));
 
-  // The big score row: the .score on one side, the match-score
-  // column on the other. Player 0 (left card) puts the match
-  // column on the RIGHT of the score; player 1 (right card)
-  // puts it on the LEFT. This mirrors the user's mockup where
-  // each player's "sets/legs in current set" sits flush against
-  // the inner edge of the card, so the two values "face each
-  // other" across the gap between cards.
+  // The big score. Add .long class when ≥1000 so it shrinks to fit.
+  // Per user direction, ONLY the actual score is shown — the
+  // match-score column (sets/legs) is not rendered here.
   const scoreStr = String(player.score);
   const scoreClass = 'score' + (scoreStr.length >= 4 ? ' long' : '');
-  const scoreRow = el('div', { class: 'player-score-row' });
-  const matchEl = el('div', { class: 'match-score' });
-  if (game.type === 'x01') {
-    const setsToWin = (game.opts && game.opts.setsToWin) || 1;
-    const legsToWin = (game.opts && game.opts.legsToWin) || 1;
-    const showSets = setsToWin > 1;
-    const showLegs = legsToWin > 1;
-    if (showSets) {
-      matchEl.appendChild(el('div', { class: 'match-sets',
-        title: 'Sets won (first to ' + setsToWin + ')' },
-        String(player.setsWon || 0)));
-    }
-    if (showLegs) {
-      matchEl.appendChild(el('div', { class: 'match-legs',
-        title: 'Legs won in this set (first to ' + legsToWin + ')' },
-        String(player.legsWon || 0)));
-    }
-  }
-  // P1 → score first, then match column on the right.
-  // P2 → match column first, then score on the right.
-  if (idx === 0) {
-    scoreRow.appendChild(el('div', { class: scoreClass }, scoreStr));
-    if (matchEl.childNodes.length) scoreRow.appendChild(matchEl);
-  } else {
-    if (matchEl.childNodes.length) scoreRow.appendChild(matchEl);
-    scoreRow.appendChild(el('div', { class: scoreClass }, scoreStr));
-  }
-  card.appendChild(scoreRow);
+  card.appendChild(el('div', { class: scoreClass }, scoreStr));
 
   // Cricket gets a compact one-row mark grid below the score; other
   // modes have nothing more to show (the toolbar already shows legs/
