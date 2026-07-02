@@ -2119,12 +2119,6 @@ function openHistoryEdit(idx) {
     // applies repeated entries as multiple marks, so [20, 20, 20]
     // is a T20, [25, 25] is a double bull (= 2 marks), etc.
     if (game.type === 'cricket') {
-      // Hint line — explains the per-dart grid. The hint used to
-      // sit above the grid (top of calcHost); keeping it on top is
-      // fine because the dart pad is what the user interacts with.
-      calcHost.appendChild(el('div', { class: 'calc-hint', style: 'margin-bottom:8px' },
-        'Cricket: tap the segment you hit (T = triple, D = double, S = single). 3 marks close a number 15-20; 2 marks close the bull. Tap MISS for a no-mark dart. Tap Next ▶ to end the turn early.'));
-
       // cricket-grid: 3 columns (T/D/S), one row per segment from
       // 20 down to 15, plus a bull row at the top (25/50 — there's
       // no triple bull in cricket) and a MISS/Next row at the
