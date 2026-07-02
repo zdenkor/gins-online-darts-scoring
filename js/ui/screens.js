@@ -1588,6 +1588,208 @@ function openHistoryEdit(idx) {
     return host;
   }
 
+  // ----------------------------------------------------------------
+  // End-of-match panel: replaces the simple "X wins!" card that used
+  // to sit in the calcHost when game.winner is set. Shows the final
+  // match score and three buttons:
+  //   History — opens a modal with the chronological per-leg log
+  //             (same data shape as the shared-history-strip).
+  //   Stats   — opens a modal with per-player summary stats
+  //             (legs won, 3-dart avg, high checkout, checkout %, etc.).
+  //   Finish  — calls endMatch() (records the result and routes back
+  //             to the menu / bracket / league depending on matchMode).
+  // The panel stays in the calcHost slot so the toolbar, player cards
+  // and history strip above remain visible — the user gets the result
+  // without losing the visual context of the finished game.
+  // ----------------------------------------------------------------
+
+  // Build the end-of-match panel that sits in calcHost. Renders the
+  // trophy line, the final score row, and the three action buttons.
+  function buildEndOfMatchPanel() {
+    const wIdx = game.winner;
+    const wName = game.players[wIdx]?.name || '?';
+    const card = el('div', { class: 'card end-of-match', style: 'text-align:center' });
+
+    // Trophy / winner line — same wording as the original card so
+    // muscle-memory carries over.
+    card.appendChild(el('h2', { style: 'margin:0 0 4px' }, `🏆 ${wName} wins the match!`));
+
+    // Final score row. For multi-set matches, show sets and legs;
+    // for single-set matches, just legs. The format mirrors the
+    // pre-existing winner card's "Final: X" line.
+    const setsToWin = game.opts?.setsToWin || 1;
+    const scoreText = setsToWin > 1
+      ? game.players.map(p => `${p.name} ${p.setsWon || 0} sets · ${p.legsWon || 0} legs`).join(' · ')
+      : 'Final: ' + game.players.map(p => `${p.name} ${p.legsWon || 0}`).join(' · ');
+    card.appendChild(el('div', { class: 'muted eom-score' }, scoreText));
+
+    // Three action buttons: History, Stats, Finish. Equal width via
+    // flex on the row. Primary styling on Finish since it's the
+    // "leave the game" affordance the user is most likely to want.
+    const btnRow = el('div', { class: 'btn-row eom-buttons', style: 'margin-top:14px' });
+    btnRow.appendChild(el('button', { class: 'btn ghost', onclick: openEndHistoryModal }, 'History'));
+    btnRow.appendChild(el('button', { class: 'btn ghost', onclick: openEndStatsModal }, 'Stats'));
+    btnRow.appendChild(el('button', { class: 'btn primary', onclick: endMatch }, 'Finish'));
+    card.appendChild(btnRow);
+
+    return card;
+  }
+
+  // History modal — opens a chronological table of all turns in the
+  // match, grouped by leg. Mirrors the data shown in the shared
+  // history strip (P1 thrown/remaining, P2 thrown/remaining, round
+  // dart-count) but in a bigger modal layout that can be scrolled.
+  function openEndHistoryModal() {
+    const body = el('div', { class: 'eom-history' });
+
+    if (game.players.length < 2) {
+      body.appendChild(el('p', { class: 'muted' }, 'Match history (single-player game).'));
+      showModal({ title: 'Match history', body, actions: [{ label: 'Close', onclick: closeModal }] });
+      return;
+    }
+
+    const p1 = game.players[0];
+    const p2 = game.players[1];
+    // Group rawDarts entries by legIdx. legIdx is per-game (starts at 0).
+    // rawDarts contains a mix of {endLeg} markers and per-turn entries.
+    const legs = []; // array of { p1Turns: [], p2Turns: [], winner: name|null }
+    let cur = { p1Turns: [], p2Turns: [], winner: null, legIdx: 0 };
+    for (const ev of (game.rawDarts || [])) {
+      if (ev.endLeg) {
+        // The previous turn (if any) was the leg-winning turn for the
+        // player who threw it. Capture that into cur.winner.
+        if (cur.p1Turns.length && cur.p1Turns[cur.p1Turns.length - 1].isLegWin) cur.winner = p1.name;
+        if (cur.p2Turns.length && cur.p2Turns[cur.p2Turns.length - 1].isLegWin) cur.winner = p2.name;
+        legs.push(cur);
+        cur = { p1Turns: [], p2Turns: [], winner: null, legIdx: cur.legIdx + 1 };
+        continue;
+      }
+      if (ev.by === p1.name) cur.p1Turns.push(ev);
+      else if (ev.by === p2.name) cur.p2Turns.push(ev);
+    }
+    if (cur.p1Turns.length || cur.p2Turns.length) {
+      // Trailing in-progress leg (shouldn't happen at match end, but
+      // handle gracefully).
+      if (cur.p1Turns.length && cur.p1Turns[cur.p1Turns.length - 1].isLegWin) cur.winner = p1.name;
+      if (cur.p2Turns.length && cur.p2Turns[cur.p2Turns.length - 1].isLegWin) cur.winner = p2.name;
+      legs.push(cur);
+    }
+
+    if (legs.length === 0) {
+      body.appendChild(el('p', { class: 'muted' }, 'No turns recorded.'));
+    } else {
+      legs.forEach((leg, li) => {
+        // Leg header: "Leg 1 — Gin" (winner bolded) or "Leg 1 — in progress"
+        const headerText = leg.winner
+          ? `Leg ${li + 1} — ${leg.winner} won`
+          : `Leg ${li + 1} — in progress`;
+        const legHeader = el('div', { class: 'eom-leg-header' }, headerText);
+        if (leg.winner) legHeader.classList.add('eom-leg-won');
+        body.appendChild(legHeader);
+
+        // Per-player turn list — each turn is "Dart1 · Dart2 · Dart3 = total"
+        // (or "BUST" if bust). Last turn of the winning player is marked.
+        const legGrid = el('div', { class: 'eom-leg-grid' });
+        const renderTurns = (turns, label) => {
+          const col = el('div', { class: 'eom-turn-col' });
+          col.appendChild(el('div', { class: 'eom-turn-label' }, label));
+          if (!turns.length) {
+            col.appendChild(el('div', { class: 'muted' }, '—'));
+            return col;
+          }
+          turns.forEach(t => {
+            const txt = t.bust ? 'BUST' : `${formatThrownDarts(t)} = ${t.total}`;
+            const row = el('div', { class: 'eom-turn-row' + (t.isLegWin ? ' win' : '') }, txt);
+            col.appendChild(row);
+          });
+          return col;
+        };
+        legGrid.appendChild(renderTurns(leg.p1Turns, p1.name));
+        legGrid.appendChild(renderTurns(leg.p2Turns, p2.name));
+        body.appendChild(legGrid);
+      });
+    }
+
+    showModal({ title: 'Match history', body, actions: [{ label: 'Close', onclick: closeModal }] });
+  }
+
+  // Stats modal — per-player summary table for the finished match.
+  // Uses the same `computeStats(playerName, history, scope)` plumbing
+  // as the global Stats screen, but feeds it a single synthetic game
+  // entry so the numbers reflect THIS match only (not all-time).
+  function openEndStatsModal() {
+    const body = el('div', { class: 'eom-stats' });
+    const players = game.players || [];
+    if (players.length < 2) {
+      body.appendChild(el('p', { class: 'muted' }, 'No stats (single-player game).'));
+      showModal({ title: 'Match stats', body, actions: [{ label: 'Close', onclick: closeModal }] });
+      return;
+    }
+    // Synthetic history = this one game, scoped as 'standalone' so the
+    // stats module's filterByScope returns it for a standalone scope.
+    const entry = {
+      ...game,
+      scope: game.scope || { type: 'standalone' },
+    };
+    const history = [entry];
+
+    // Per-player stat columns (one row per stat, one col per player).
+    // Mirrors the style of the global Stats screen, but compact.
+    const statNames = players.map(p => p.name);
+    // Use computeStats to pull each metric. computeStats returns an
+    // object with these fields (see game/stats.js):
+    //   legsWon, legsPlayed, average, first9Average, highestCheckout,
+    //   count180, count140Plus, count100Plus, legsWonCheckoutPcnt,
+    //   bestLegDarts, legsTo9/12/15/18/21, withThrowAverage, etc.
+    // bustCount is not in the result; derive it from the turns.
+    const stats = {};
+    const busts = {};
+    for (const p of players) {
+      stats[p.name] = computeStats(p.name, history, { type: 'standalone' });
+      busts[p.name] = (game.rawDarts || []).filter(e => e && e.by === p.name && e.bust).length;
+    }
+    // Define the rows in display order. The "label" is shown in the
+    // left column; values come from each player's stats object.
+    const rowDefs = [
+      { label: 'Legs won',         pick: s => s.legsWon || 0 },
+      { label: '3-dart avg',       pick: s => s.average != null ? s.average.toFixed(1) : '—' },
+      { label: 'First-9 avg',      pick: s => s.first9Average != null ? s.first9Average.toFixed(1) : '—' },
+      { label: 'High checkout',    pick: s => s.highestCheckout || 0 },
+      { label: '180s',             pick: s => s.count180 || 0 },
+      { label: '140+',             pick: s => s.count140Plus || 0 },
+      { label: '100+',             pick: s => s.count100Plus || 0 },
+      { label: 'Checkout %',       pick: s => s.legsWonCheckoutPcnt != null ? s.legsWonCheckoutPcnt.toFixed(0) + '%' : '—' },
+      { label: 'Busts',            pick: (_, n) => busts[n] || 0 },
+      { label: 'Best leg (darts)', pick: s => s.bestLegDarts || '—' },
+    ];
+    // Build the table.
+    const table = el('table', { class: 'eom-stats-table' });
+    const thead = el('thead');
+    const headRow = el('tr');
+    headRow.appendChild(el('th', {}, ''));
+    statNames.forEach(n => headRow.appendChild(el('th', {}, n)));
+    thead.appendChild(headRow);
+    table.appendChild(thead);
+    const tbody = el('tbody');
+    rowDefs.forEach(rd => {
+      const tr = el('tr');
+      tr.appendChild(el('td', { class: 'eom-stats-label' }, rd.label));
+      statNames.forEach(n => {
+        const v = rd.pick(stats[n], n);
+        tr.appendChild(el('td', {}, String(v)));
+      });
+      tbody.appendChild(tr);
+    });
+    table.appendChild(tbody);
+    body.appendChild(table);
+
+    // Note for the user: stats are scoped to THIS match.
+    body.appendChild(el('p', { class: 'muted', style: 'margin-top:8px; font-size:0.9em' },
+      'Stats are scoped to this match only.'));
+
+    showModal({ title: 'Match stats', body, actions: [{ label: 'Close', onclick: closeModal }] });
+  }
+
   function render() {
     meta.innerHTML = '';
     meta.appendChild(el('div', {}, 'Game', el('strong', {}, cap(game.type))));
@@ -1602,11 +1804,17 @@ function openHistoryEdit(idx) {
       const setsToWin = game.opts.setsToWin;
       const legsToWin = game.opts.legsToWin;
       if (setsToWin > 1) {
-        meta.appendChild(el('div', {}, 'Sets:', el('strong', {}, String(setsToWin))));
+        meta.appendChild(el('div', {}, 'S:', el('strong', {}, String(setsToWin))));
       }
       {
-        meta.appendChild(el('div', {}, 'Legs:', el('strong', {}, String(legsToWin))));
+        meta.appendChild(el('div', {}, 'L:', el('strong', {}, String(legsToWin))));
       }
+      // Mode label: e.g. "501", or "501 · DI/DO" when in/out rules are set.
+      // Single in/out are omitted (anything goes → not worth printing).
+      const inLabel = game.opts.in !== 'single' ? X01_IN_OPTIONS[game.opts.in]?.label : '';
+      const outLabel = game.opts.out !== 'single' ? X01_OUT_OPTIONS[game.opts.out]?.label : '';
+      const ioLabel = [inLabel, outLabel].filter(Boolean).join('/');
+      meta.appendChild(el('div', {}, '', el('strong', {}, `${game.opts.start}${ioLabel ? ' · ' + ioLabel : ''}`)));
       // Live match status — only when at least one of sets/legs
       // is multi (>1). Format:
       //   sets > 1, legs > 1 → "3:2 (2:1)"   sets.setsWon : sets.legsWon
@@ -1616,6 +1824,11 @@ function openHistoryEdit(idx) {
       //   both 1 → not rendered
       // P1's count is on the left of the colon, P2 on the right
       // (mirrors the player-card left-to-right layout).
+      // Absolutely centered in the visual middle of the toolbar
+      // (between "Game: 501 · DO" on the left and the
+      // fullscreen/exit icons on the right). Appended to the
+      // toolbar (not meta) so CSS absolute centering is anchored
+      // to the toolbar, not the meta flex row.
       // Font is 80% of the surrounding meta items so it reads
       // as a status line, not a primary label.
       if ((setsToWin || 1) > 1 || (legsToWin || 1) > 1) {
@@ -1634,16 +1847,15 @@ function openHistoryEdit(idx) {
               { class: 'match-status-row',
                 title: 'Current match status — sets (legs in current set)' },
               status);
-            meta.appendChild(statusEl);
+            // Append to the toolbar (not meta) so absolute centering
+            // places it in the visual middle of the bar, independent
+            // of where the meta flex row ends. Sits in the centre
+            // between "Game: 501 · DO" on the left and the
+            // fullscreen/exit icons on the right.
+            toolbar.appendChild(statusEl);
           }
         }
       }
-      // Mode label: e.g. "501", or "501 · DI/DO" when in/out rules are set.
-      // Single in/out are omitted (anything goes → not worth printing).
-      const inLabel = game.opts.in !== 'single' ? X01_IN_OPTIONS[game.opts.in]?.label : '';
-      const outLabel = game.opts.out !== 'single' ? X01_OUT_OPTIONS[game.opts.out]?.label : '';
-      const ioLabel = [inLabel, outLabel].filter(Boolean).join('/');
-      meta.appendChild(el('div', {}, 'Game:', el('strong', {}, `${game.opts.start}${ioLabel ? ' · ' + ioLabel : ''}`)));
     }
     if (game.type === 'shanghai') meta.appendChild(el('div', {}, 'Target', el('strong', {}, `Number ${Math.min(game.round, game.opts.n)}/${game.opts.n}`)));
     if (game.online) meta.appendChild(el('div', {}, 'Online', el('strong', {}, 'Host')));
@@ -1708,17 +1920,12 @@ function openHistoryEdit(idx) {
       });
     }
 
-    // Calculator or winner summary
+    // Calculator or end-of-match panel
     calcHost.innerHTML = '';
     if (game.winner != null) {
-      calcHost.appendChild(el('div', { class: 'card', style: 'text-align:center' },
-        el('h2', { style: 'margin:0 0 4px' }, `🏆 ${game.players[game.winner].name} wins the match!`),
-        el('div', { class: 'muted' }, 'Final: ' + game.players.map(p => `${p.name} ${p.legsWon}`).join(' · ')),
-        el('div', { class: 'btn-row', style: 'margin-top:10px' },
-          el('button', { class: 'btn primary', onclick: endMatch }, game.matchMode ? 'Save & back' : 'New game'),
-          el('button', { class: 'btn ghost', onclick: () => router.go(game.matchMode ? (game.matchMode ? 'bracket-view' : 'menu') : 'menu') }, 'Close'),
-        ),
-      ));
+      // End-of-match: show the final score and three buttons
+      // (History, Stats, Finish) — see buildEndOfMatchPanel().
+      calcHost.appendChild(buildEndOfMatchPanel());
       return;
     }
     // Compute running leg total for the current player (sum of recent turns since last bust)

@@ -4,6 +4,37 @@ All notable changes to Gin's Online Dart's Scoring System are documented here.
 Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 Versions follow [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.6.2] - 2026-07-02
+
+### Added
+- **End-of-match panel** (replaces the simple "X wins!" card). When
+  `game.winner` is set, the calcHost now shows the final match score
+  with three action buttons:
+  - **History** — opens a modal with the chronological per-leg log
+    (leg header + 2-column P1/P2 turn list, leg winner highlighted).
+  - **Stats** — opens a modal with a per-player summary table
+    (10 rows: Legs won, 3-dart avg, First-9 avg, High checkout,
+    180s, 140+, 100+, Checkout %, Busts, Best leg darts).
+  - **Finish** — calls `endMatch()` (records the result, advances
+    the bracket in matchMode, then `router.go('menu')`).
+- The Stats modal feeds `computeStats(playerName, history, scope)`
+  with a single synthetic game entry so the numbers reflect THIS
+  match only (not all-time stats). Busts are derived from
+  `game.rawDarts` since they're not in the stats module's result.
+
+### Changed
+- **Toolbar match-status** moved from the right end of `.meta`
+  (next to the fullscreen icon) to the **visual center of the
+  toolbar**, absolutely positioned (`left: 50%; top: 50%;
+  transform: translate(-50%, -50%)`). Appended to `.game-toolbar`
+  (not `.meta`) so the centering anchors to the toolbar itself.
+- **Toolbar match-status font size**: `0.8em` → `2.4em` (~34.6px on
+  a 16px body), matching the `<strong>` value size in "Game: 501 · DO".
+- **Toolbar label "Game:"** is now hidden (the `<strong>` "501 · DO"
+  value remains). The user wanted only the value, not the label.
+- **Toolbar labels "Sets:" and "Legs:"** shortened to "S:" and "L:"
+  to keep the toolbar compact.
+
 ## [0.5.8] - 2026-07-01
 
 ### Added

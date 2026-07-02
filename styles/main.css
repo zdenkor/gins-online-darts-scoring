@@ -636,6 +636,11 @@ select.input option, select.dropdown-readable option {
   display: flex; flex-wrap: nowrap; gap: 1.5%; align-items: center; justify-content: space-between;
   background: var(--surface); border: 1px solid var(--line); border-radius: var(--radius);
   padding: 0.55vh 2%; margin-bottom: 1%;
+  /* `position: relative` anchors the absolutely-positioned
+     `.match-status-row` so it can be centered in the middle of
+     the bar (left: 50%; transform: translateX(-50%)) without
+     escaping the toolbar bounds. */
+  position: relative;
   /* 90% font-size relative to parent so the toolbar content is
      ~10% smaller than the rest of the screen — buttons, meta text
      and totals all scale together. Padding also shrinks by ~10%
@@ -666,18 +671,32 @@ select.input option, select.dropdown-readable option {
   overflow: hidden;
   text-overflow: ellipsis;
 }
-/* Live match status (e.g. "3:2 (2:1)"). Sits at the end of
-   the meta row, just before the toolbar's right-side icons
-   (fullscreen, exit). Font is 80% of the surrounding meta
-   items so it reads as a status line, not a primary label.
+/* Live match status (e.g. "3:2 (2:1)"). Absolutely positioned
+   in the visual centre of the toolbar — sits between the
+   "Game: 501 · DO" text on the left and the fullscreen/exit
+   icons on the right. Appended to `.game-toolbar` (not meta)
+   so its absolute position is anchored to the toolbar itself.
    `font-variant-numeric: tabular-nums` keeps the digits
    monospaced so the "1" / "2" / "3" don't shift width
-   as the count changes. */
-.game-toolbar .meta .match-status-row {
-  font-size: 0.8em;
+   as the count changes. Font size is 2.4em — the user's
+   explicit request "size of the games status to 2.4em".
+   Scales with the toolbar's 90% font-size (2.4 × 90% =
+   2.16× of body, e.g. ~34.6px on a 16px body / 1080 viewport). */
+.game-toolbar .match-status-row {
+  position: absolute;
+  left: 50%;
+  top: 50%;
+  transform: translate(-50%, -50%);
+  white-space: nowrap;
+  font-size: 2.4em;
   font-variant-numeric: tabular-nums;
   font-weight: 600;
   color: var(--text);
+  /* The text may be wrapped in a red outlined box by the
+     underlying render — the box stays the same width as the
+     text via white-space: nowrap, and absolute centering keeps
+     it visually centered regardless. */
+  pointer-events: auto;
 }
 .game-toolbar .meta strong {
   color: var(--text);
@@ -1877,6 +1896,71 @@ footer.app-footer .version {
   min-height: 48px;
   font-size: 15px;
   padding: 12px 16px;
+}
+
+/* ---------- End-of-match panel + History/Stats modals ----------
+   Shown in calcHost once game.winner is set. The panel displays the
+   final score and three buttons (History, Stats, Finish); each button
+   opens a sub-modal with the per-leg log or per-player stats table. */
+.end-of-match .eom-score {
+  font-size: 1.05em;
+  margin-bottom: 6px;
+}
+/* Three-column row for the action buttons. Inherits .btn-row's gap
+   + margin; only overrides the column count. */
+.end-of-match .eom-buttons {
+  grid-template-columns: repeat(3, 1fr);
+}
+
+/* History modal — per-leg scrollable log. Each leg block has a
+   header row + a 2-column grid (P1 turns | P2 turns). */
+.eom-history { max-height: 60vh; overflow-y: auto; }
+.eom-leg-header {
+  font-weight: 600;
+  margin: 12px 0 4px;
+  color: var(--muted);
+}
+.eom-leg-header.eom-leg-won { color: var(--accent); }
+.eom-leg-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 12px;
+  padding: 4px 0 8px;
+  border-bottom: 1px solid var(--line);
+}
+.eom-turn-label {
+  font-size: 0.85em;
+  color: var(--muted);
+  margin-bottom: 2px;
+}
+.eom-turn-row {
+  font-variant-numeric: tabular-nums;
+  font-size: 0.9em;
+  padding: 2px 0;
+}
+.eom-turn-row.win { color: var(--accent); font-weight: 600; }
+
+/* Stats modal — compact per-player table. */
+.eom-stats-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 14px;
+}
+.eom-stats-table th,
+.eom-stats-table td {
+  padding: 6px 10px;
+  text-align: right;
+  border-bottom: 1px solid var(--line);
+}
+.eom-stats-table th:first-child,
+.eom-stats-table td:first-child {
+  text-align: left;
+  color: var(--muted);
+}
+.eom-stats-table thead th {
+  font-weight: 600;
+  color: var(--text);
+  border-bottom: 2px solid var(--line);
 }
 
 /* Cmd list (used in the "More commands" modal) — label and
