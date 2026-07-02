@@ -1630,7 +1630,11 @@ function openHistoryEdit(idx) {
 
     showModal({
       title: `🏆 ${wName} wins the match!`,
-      body: scoreText,
+      // Wrap the score text in a <div class="eom-score-text"> so we
+      // can bump the font in CSS without affecting the default
+      // .modal-body sizing (other modals — Save game, Exit, etc. —
+      // share the default).
+      body: el('div', { class: 'eom-score-text' }, scoreText),
       // `dismissable: false` opts out of backdrop-click and Escape
       // dismissal — the user must pick History / Stats / Finish
       // explicitly (matches the v0.6.2 product spec for the

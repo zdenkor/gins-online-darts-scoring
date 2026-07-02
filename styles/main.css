@@ -1899,17 +1899,20 @@ footer.app-footer .version {
 }
 
 /* ---------- End-of-match panel + History/Stats modals ----------
-   Shown in calcHost once game.winner is set. The panel displays the
-   final score and three buttons (History, Stats, Finish); each button
-   opens a sub-modal with the per-leg log or per-player stats table. */
-.end-of-match .eom-score {
-  font-size: 1.05em;
-  margin-bottom: 6px;
-}
-/* Three-column row for the action buttons. Inherits .btn-row's gap
-   + margin; only overrides the column count. */
-.end-of-match .eom-buttons {
-  grid-template-columns: repeat(3, 1fr);
+   v0.6.2: the end-of-match popup is a modal (same look as the
+   Save/Exit dialog) — see showEndOfMatchModal() in screens.js.
+   The .eom-score-text span sits inside the modal's body and shows
+   the final match score ("Final: Gin 1 · Alex 0" or
+   "Gin 1 sets · 2 legs · Alex 0 sets · 0 legs"). The History and
+   Stats sub-modals also live in this section. */
+.eom-score-text {
+  /* 1.5× the modal body base (which is 1em here = 15px in
+     .modal-body). Using em keeps the bump proportional to the
+     surrounding font-size — no hardcoded px, so the text scales
+     cleanly with the viewport and the user's font-size
+     preferences. */
+  font-size: 1.5em;
+  line-height: 1.3;
 }
 
 /* History modal — per-leg scrollable log. Each leg block has a
