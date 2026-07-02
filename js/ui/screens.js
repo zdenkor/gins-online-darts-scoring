@@ -2858,12 +2858,15 @@ function openHistoryEdit(idx) {
   function afterThrow() {
     saveLastGame(game);
     render();
-    if (game.winner != null) {
-      // The match-end broadcast happens earlier in commitTurnTotal
-      // (right after the engine sets winner) so the peer's UI
-      // learns the match is over before we navigate.
-      endMatch();
-    }
+    // Note: do NOT auto-call endMatch() here. The end-of-match panel
+    // (rendered in calcHost when game.winner != null) has its own
+    // "Finish" button that the user clicks to record the result and
+    // route back to the menu / bracket / league. Auto-calling
+    // endMatch() in afterThrow used to immediately fire
+    // router.go('menu') and the user never saw the final score
+    // panel. The match-end broadcast still happens earlier in
+    // commitTurnTotal (right after the engine sets winner) so
+    // peers learn the match is over before this screen goes away.
   }
 
   // Back-to-admin link. Shows when the game was started from a
