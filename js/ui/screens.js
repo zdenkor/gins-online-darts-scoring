@@ -2069,18 +2069,28 @@ function openHistoryEdit(idx) {
     // The toolbar's Undo button moved to the calc's action row
     // (leftmost position) since Undo is a per-turn action and
     // fits with the other turn-level commands.
-    calc = renderCalculator({
-      legRunningTotal: legTotal,
-      onCommit: commitTurnTotal,
-      onSetScore: confirmSetScore,
-      onUndo: undo,
-      onRedo: redo,
-      onMoreCommands: showMoreCommands,
-      // Re-render the player cards on every calc input so the
-      // .clickable class updates in sync with the buffer state.
-      onChange: () => { repaintScoreboard(); },
-    });
-    calcHost.appendChild(calc);
+    // X01 games use the standard numpad-style calculator. Cricket
+    // and Shanghai use their own per-dart input UI (built further
+    // down in this function), so they skip renderCalculator
+    // entirely. The X01 calculator exposes a few hooks the game
+    // code calls into (commitTurnTotal, confirmSetScore, undo,
+    // redo, showMoreCommands, repaintScoreboard on input); none of
+    // those apply to Cricket/Shanghai so it's safe to leave calc
+    // = null and skip appendChild(calc).
+    if (game.type !== 'cricket' && game.type !== 'shanghai') {
+      calc = renderCalculator({
+        legRunningTotal: legTotal,
+        onCommit: commitTurnTotal,
+        onSetScore: confirmSetScore,
+        onUndo: undo,
+        onRedo: redo,
+        onMoreCommands: showMoreCommands,
+        // Re-render the player cards on every calc input so the
+        // .clickable class updates in sync with the buffer state.
+        onChange: () => { repaintScoreboard(); },
+      });
+      calcHost.appendChild(calc);
+    }
     // If Cricket: replace the X01 calculator with a per-dart grid so
     // the player can mark each dart individually. The dart pad has
     // three columns: triple (T), double (D), single (S) — one row
