@@ -2081,20 +2081,62 @@ function openHistoryEdit(idx) {
       onChange: () => { repaintScoreboard(); },
     });
     calcHost.appendChild(calc);
-    // If Cricket: append a per-dart grid so the player can still mark each dart
+    // If Cricket: replace the X01 calculator with a per-dart grid so
+    // the player can mark each dart individually. The dart pad has
+    // three columns: triple (T), double (D), single (S) — one row
+    // per cricket number 20 down to 15, plus a bull row (T/D/S for
+    // bull is really only meaningful as 50/25/0 since the bull
+    // doesn't have a triple ring in cricket scoring, but we still
+    // need 25 = single bull and 50 = double bull). "MISS" commits
+    // a 0-mark dart; "Next ▶" ends the turn early.
+    //
+    // Each T/D/S tap pushes 3/2/1 mark(s) of the segment into
+    // game.cricketDarts (see commitCricketDart below). The engine
+    // applies repeated entries as multiple marks, so [20, 20, 20]
+    // is a T20, [25, 25] is a double bull (= 2 marks), etc.
     if (game.type === 'cricket') {
-      calcHost.appendChild(el('div', { style: 'height:10px' }));
-      const darts = el('div', { class: 'calc-hint', style: 'margin-bottom:8px' }, 'Cricket marks per dart: tap a number 3 times for T, 2 for D, 1 for S. Tap BULL same way.');
-      calcHost.appendChild(darts);
-      const dartPad = el('div', { style: 'display:flex; flex-wrap:wrap; gap:6px; justify-content:center' });
-      const cricketSegments = [15, 16, 17, 18, 19, 20, 25];
-      cricketSegments.forEach(n => {
-        const lbl = n === 25 ? 'BULL' : String(n);
-        dartPad.appendChild(el('button', { class: 'btn', onclick: () => commitCricketDart(n) }, lbl));
-      });
-      dartPad.appendChild(el('button', { class: 'btn ghost', title: 'Miss', onclick: () => commitCricketDart(0) }, 'MISS'));
-      dartPad.appendChild(el('button', { class: 'btn primary', title: 'End turn', onclick: endCricketTurn }, 'Next ▶'));
-      calcHost.appendChild(dartPad);
+      // Hint line — explains the per-dart grid. The hint used to
+      // sit above the grid (top of calcHost); keeping it on top is
+      // fine because the dart pad is what the user interacts with.
+      calcHost.appendChild(el('div', { class: 'calc-hint', style: 'margin-bottom:8px' },
+        'Cricket: tap the segment you hit (T = triple, D = double, S = single). 3 marks close a number 15-20; 2 marks close the bull. Tap MISS for a no-mark dart. Tap Next ▶ to end the turn early.'));
+
+      // cricket-grid: 3 columns (T/D/S), one row per segment from
+      // 20 down to 15, plus a bull row at the top (25/50 — there's
+      // no triple bull in cricket) and a MISS/Next row at the
+      // bottom. Buttons use the shared .btn class for the visual
+      // style; T buttons get a ghost-variant accent so the three
+      // columns are visually distinct.
+      const grid = el('div', { class: 'cricket-dartpad' });
+
+      // Bull row (top): "MISS" | "25 (single bull)" | "50 (double bull)"
+      // Note: 50 in cricket = double bull = 2 marks, so the 50
+      // button commits [25, 25] (2 marks on segment 25). 25 = 1
+      // mark. There is no triple-bull in cricket (no 75).
+      const bullRow = el('div', { class: 'cricket-dartpad-row cricket-dartpad-bull' });
+      bullRow.appendChild(el('button', { class: 'btn ghost', title: 'Miss (no mark)', onclick: () => commitCricketDart(0) }, 'MISS'));
+      bullRow.appendChild(el('button', { class: 'btn',         title: 'Single bull (1 mark)', onclick: () => commitCricketDart(25, 1) }, '25'));
+      bullRow.appendChild(el('button', { class: 'btn primary', title: 'Double bull (2 marks)', onclick: () => commitCricketDart(25, 2) }, '50'));
+      grid.appendChild(bullRow);
+
+      // One row per number 20 down to 15. T = 3 marks, D = 2
+      // marks, S = 1 mark. Segment number is the cell label.
+      for (let n = 20; n >= 15; n--) {
+        const row = el('div', { class: 'cricket-dartpad-row' });
+        row.appendChild(el('button', { class: 'btn ghost', title: `Triple ${n} (3 marks)`, onclick: () => commitCricketDart(n, 3) }, `T${n}`));
+        row.appendChild(el('button', { class: 'btn',        title: `Double ${n} (2 marks)`, onclick: () => commitCricketDart(n, 2) }, `D${n}`));
+        row.appendChild(el('button', { class: 'btn',        title: `Single ${n} (1 mark)`,  onclick: () => commitCricketDart(n, 1) }, `${n}`));
+        grid.appendChild(row);
+      }
+
+      // Next ▶ button — ends the turn early. Centered on its own
+      // row, same width as one dart-pad cell so it lines up with
+      // the column grid above.
+      const nextRow = el('div', { class: 'cricket-dartpad-row cricket-dartpad-next' });
+      nextRow.appendChild(el('button', { class: 'btn primary', title: 'End turn', onclick: endCricketTurn }, 'Next ▶'));
+      grid.appendChild(nextRow);
+
+      calcHost.appendChild(grid);
     }
   }
 
@@ -2511,15 +2553,24 @@ function openHistoryEdit(idx) {
 
   // Cricket: per-dart entry. Each click adds a mark segment. The turn
   // ends when the player hits "Next ▶" or has added 3 marks.
-  function commitCricketDart(seg) {
+  //
+  // `marks` (1, 2 or 3) tells how many marks the dart hit on the
+  // given segment — 1 for a single (e.g. the "20" button), 2 for
+  // a double ("D20"), 3 for a triple ("T20"). The engine applies
+  // repeated entries as multiple marks (see submitTurnCricketMarks
+  // in js/game/engine.js — "[20, 20, 20]" is a T20, "[25, 25]" is
+  // a double-bull). So the button just pushes the segment N times.
+  function commitCricketDart(seg, marks = 1) {
     if (game.winner != null) return;
     if (!game.cricketDarts) game.cricketDarts = [];
-    if (seg === 0) {
-      game.cricketDarts.push(0);
-    } else {
-      game.cricketDarts.push(seg);
-    }
-    // Auto-end at 3 darts
+    // Clamp marks to the per-segment max (3 for 15-20, 2 for bull=25
+    // and 0=miss), so a 4th accidental tap doesn't over-shoot the
+    // segment cap. The engine already clamps to "need" (3 for 15-20,
+    // 2 for bull) so this is a UI nicety, not a correctness fix.
+    const cap = (seg === 25) ? 2 : (seg === 0 ? 0 : 3);
+    const n = Math.max(0, Math.min(marks, cap));
+    for (let i = 0; i < n; i++) game.cricketDarts.push(seg);
+    // Auto-end at 3 darts (MAX_DARTS_PER_TURN).
     if (game.cricketDarts.length >= MAX_DARTS_PER_TURN) endCricketTurn();
   }
   function endCricketTurn() {

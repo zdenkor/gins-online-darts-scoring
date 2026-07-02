@@ -1053,6 +1053,46 @@ select.input option, select.dropdown-readable option {
 .cricket-scorecard-row.active .cs-dart {
   color: var(--accent);
 }
+
+/* =================================================================
+   Cricket dartpad (calculator replacement on the game screen for
+   Cricket games). Three columns (T/D/S) per cricket number, plus
+   a bull row at the top and a Next row at the bottom. Each row
+   is its own grid so the buttons line up under each other across
+   rows — important on narrow screens where the pad is the user's
+   primary input.
+   ================================================================= */
+.cricket-dartpad {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  width: 100%;
+  max-width: 320px;
+  margin: 0 auto;
+}
+.cricket-dartpad-row {
+  display: grid;
+  grid-template-columns: 1fr 1fr 1fr;
+  gap: 6px;
+}
+.cricket-dartpad-row > .btn {
+  /* Buttons share the .btn class, but their text (T20, D20, 20, 50, …)
+     is longer than the X01 numpad digits. Use a slightly smaller min
+     height than the numpad so the pad doesn't push the screen too
+     tall on small viewports. Font-size follows the .btn defaults
+     and the .calc-hint class doesn't apply here. */
+  min-height: 2.6em;
+  padding: 0.4em 0.6em;
+  font-weight: 600;
+}
+.cricket-dartpad-row.cricket-dartpad-next {
+  /* Next ▶ button is full-width across the row — centred with one
+     column so the rest of the grid (T/D/S) is unchanged above. */
+  grid-template-columns: 1fr;
+}
+.cricket-dartpad-row.cricket-dartpad-next > .btn {
+  min-height: 2.8em;
+}
 .player-card {
   background: var(--surface); border: 1px solid var(--line); border-radius: var(--radius);
   padding: 4px 6px;
