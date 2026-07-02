@@ -1966,6 +1966,23 @@ footer.app-footer .version {
   border-bottom: 2px solid var(--line);
 }
 
+/* Section header rows (Averages, High Turns, Checkouts, etc.) span
+   the full table width and use a muted look so the data rows
+   stand out. Same role as the section rows in the global Stats
+   screen. */
+.eom-stats-table .eom-stats-section th {
+  font-size: 0.9em;
+  font-weight: 600;
+  color: var(--muted);
+  background: var(--bg-2);
+  text-align: left;
+  border-bottom: 1px solid var(--line);
+  border-top: 1px solid var(--line);
+  padding: 4px 10px;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+}
+
 /* Cmd list (used in the "More commands" modal) — label and
    description are both ~30% larger than the previous sizing
    to match the modal-title's 30% bump. The icons in the label

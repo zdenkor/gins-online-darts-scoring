@@ -1765,42 +1765,106 @@ function openHistoryEdit(idx) {
     }
     // Synthetic history = this one game, scoped as 'standalone' so the
     // stats module's filterByScope returns it for a standalone scope.
+    //
+    // Normalize `players` to a string[] before handing the entry to
+    // computeStats. walkGame (in js/game/stats.js) builds its
+    // per-player buckets by using each entry of `entry.players` as an
+    // Object key — so passing in the raw player objects from
+    // `game.players` (which have {name, score, legsWon, ...})
+    // collapses every player into a single "[object Object]" key
+    // and every stat comes out as 0. The global Stats screen
+    // avoids this because its test fixtures use string arrays
+    // (see tests/stats.test.mjs) — real game objects (built by
+    // new01 in engine.js) are player objects, and need this
+    // normalization at the call site.
     const entry = {
       ...game,
+      players: (game.players || []).map(p => typeof p === 'string' ? p : p.name),
       scope: game.scope || { type: 'standalone' },
     };
     const history = [entry];
 
-    // Per-player stat columns (one row per stat, one col per player).
-    // Mirrors the style of the global Stats screen, but compact.
+    // Per-player stat columns (one row per metric, one col per
+    // player). computeStats returns the full block from
+    // js/game/stats.js — every field the global Stats screen shows
+    // is also computed here, just scoped to this one match.
     const statNames = players.map(p => p.name);
-    // Use computeStats to pull each metric. computeStats returns an
-    // object with these fields (see game/stats.js):
-    //   legsWon, legsPlayed, average, first9Average, highestCheckout,
-    //   count180, count140Plus, count100Plus, legsWonCheckoutPcnt,
-    //   bestLegDarts, legsTo9/12/15/18/21, withThrowAverage, etc.
-    // bustCount is not in the result; derive it from the turns.
     const stats = {};
-    const busts = {};
     for (const p of players) {
       stats[p.name] = computeStats(p.name, history, { type: 'standalone' });
+    }
+    // Busts are not in the computeStats result — derive from
+    // game.rawDarts. Kept here so we can render them inside the
+    // Totals section (next to Number of Darts, Total Points).
+    const busts = {};
+    for (const p of players) {
       busts[p.name] = (game.rawDarts || []).filter(e => e && e.by === p.name && e.bust).length;
     }
-    // Define the rows in display order. The "label" is shown in the
-    // left column; values come from each player's stats object.
-    const rowDefs = [
-      { label: 'Legs won',         pick: s => s.legsWon || 0 },
-      { label: '3-dart avg',       pick: s => s.average != null ? s.average.toFixed(1) : '—' },
-      { label: 'First-9 avg',      pick: s => s.first9Average != null ? s.first9Average.toFixed(1) : '—' },
-      { label: 'High checkout',    pick: s => s.highestCheckout || 0 },
-      { label: '180s',             pick: s => s.count180 || 0 },
-      { label: '140+',             pick: s => s.count140Plus || 0 },
-      { label: '100+',             pick: s => s.count100Plus || 0 },
-      { label: 'Checkout %',       pick: s => s.legsWonCheckoutPcnt != null ? s.legsWonCheckoutPcnt.toFixed(0) + '%' : '—' },
-      { label: 'Busts',            pick: (_, n) => busts[n] || 0 },
-      { label: 'Best leg (darts)', pick: s => s.bestLegDarts || '—' },
+
+    // Build the table. Mirrors the row layout of the global Stats
+    // screen (renderStatsScreen, see Averages / High Turns /
+    // Checkouts / Legs / Throwing Order / Totals sections) so the
+    // user sees the same metrics in both places — the only
+    // difference is the data source (this match vs all-time).
+    //
+    // A section header is a { section: 'Name' } entry — it spans all
+    // player columns. A data row is [label, pickFn] where pickFn
+    // takes a stats object and returns the value to display.
+    const rows = [
+      // Averages
+      { section: 'Averages' },
+      ['Average',              s => fmt(s.average)],
+      ['First 3 Average',      s => fmt(s.first3Average)],
+      ['First 9 Average',      s => fmt(s.first9Average)],
+      ['With Throw Average',   s => fmt(s.withThrowAverage)],
+      ['Against Throw Average', s => fmt(s.againstThrowAverage)],
+      ['Max Average',          s => fmt(s.maxAverage)],
+
+      // High turns (X01 only — values are 0 for other game types)
+      { section: 'High Turns' },
+      ['180s',  s => fmt(s.count180, { integer: true })],
+      ['171s',  s => fmt(s.count171, { integer: true })],
+      ['170+',  s => fmt(s.count170Plus, { integer: true })],
+      ['140+',  s => fmt(s.count140Plus, { integer: true })],
+      ['100+',  s => fmt(s.count100Plus, { integer: true })],
+
+      // Checkouts
+      { section: 'Checkouts' },
+      ['Highest Checkout', s => fmt(s.highestCheckout, { integer: true })],
+      ['Checkout 100+',    s => fmt(s.checkout100Plus, { integer: true })],
+      ['Checkout %',       s => s.legsWonCheckoutPcnt != null
+        ? `${fmt(s.legsWonCheckoutPcnt)}%`
+        : '—'],
+
+      // Leg stats
+      { section: 'Legs' },
+      ['Legs won',         s => fmt(s.legsWon, { integer: true })],
+      ['Legs played',      s => fmt(s.legsPlayed, { integer: true })],
+      ['Legs Won %',       s => `${fmt(s.legsWonPcnt)}%`],
+      ['Best leg (darts)', s => s.bestLegDarts > 0 ? fmt(s.bestLegDarts, { integer: true }) : '–'],
+      ['Legs to 9',        s => fmt(s.legsTo9, { integer: true })],
+      ['Legs to 12',       s => fmt(s.legsTo12, { integer: true })],
+      ['Legs to 15',       s => fmt(s.legsTo15, { integer: true })],
+      ['Legs to 18',       s => fmt(s.legsTo18, { integer: true })],
+      ['Legs to 21',       s => fmt(s.legsTo21, { integer: true })],
+
+      // Throwing order
+      { section: 'Throwing Order' },
+      ['Legs Throwing First',          s => fmt(s.legsThrowingFirst, { integer: true })],
+      ['Legs Throwing Second',         s => fmt(s.legsThrowingSecond, { integer: true })],
+      ['% Legs Won Throwing First',    s => `${fmt(s.legsWonFirstPcnt)}%`],
+      ['% Legs Won Throwing Second',   s => `${fmt(s.legsWonSecondPcnt)}%`],
+
+      // Totals
+      { section: 'Totals' },
+      ['Number of Darts', s => fmt(s.numberOfDarts, { integer: true })],
+      ['Total Points',    s => fmt(s.totalPoints, { integer: true })],
+      // Busts isn't in computeStats — derived from rawDarts above.
+      // We pass the busts map into the picker alongside the stats
+      // object so the picker can look it up by name.
+      ['Busts',           (_s, pName) => fmt(busts[pName] || 0, { integer: true })],
     ];
-    // Build the table.
+
     const table = el('table', { class: 'eom-stats-table' });
     const thead = el('thead');
     const headRow = el('tr');
@@ -1808,12 +1872,22 @@ function openHistoryEdit(idx) {
     statNames.forEach(n => headRow.appendChild(el('th', {}, n)));
     thead.appendChild(headRow);
     table.appendChild(thead);
+
     const tbody = el('tbody');
-    rowDefs.forEach(rd => {
+    rows.forEach(row => {
+      if (row.section) {
+        // Section header — spans the label column + every player
+        // column so the heading runs the full table width.
+        const tr = el('tr', { class: 'eom-stats-section' });
+        tr.appendChild(el('th', { colspan: String(statNames.length + 1) }, row.section));
+        tbody.appendChild(tr);
+        return;
+      }
+      const [label, pick] = row;
       const tr = el('tr');
-      tr.appendChild(el('td', { class: 'eom-stats-label' }, rd.label));
+      tr.appendChild(el('td', { class: 'eom-stats-label' }, label));
       statNames.forEach(n => {
-        const v = rd.pick(stats[n], n);
+        const v = pick(stats[n], n);
         tr.appendChild(el('td', {}, String(v)));
       });
       tbody.appendChild(tr);
