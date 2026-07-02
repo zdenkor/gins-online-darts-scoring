@@ -2309,10 +2309,22 @@ function openHistoryEdit(idx) {
   // to Off (Settings → Statistics) skips the prompt entirely.
   function maybeAskCheckoutAttempts(throwerName, target, meta) {
     if (!loadUiStatsSettings().checkoutStats) return;
-    // If the match is already over, the end-of-match popup is on
-    // screen and a checkout-attempts prompt would just sit on top
-    // of it, intercepting clicks on History/Stats/Finish. Skip.
-    if (game.winner != null) return;
+    // The match-end branch is already handled: when a turn ends the
+    // match outright (engine sets state.winner = state.current),
+    // commitTurnTotal returns early at the top ("if (game.winner !=
+    // null) return;") and we never reach this call. A leg-win in a
+    // multi-leg match keeps state.winner = null, so the question
+    // still fires for those turns — which is the right behaviour:
+    // the user wants the dart count for every close-out attempt,
+    // not just match-ending ones.
+    //
+    // (An earlier version of this function had a `if (game.winner
+    // != null) return;` guard added when the end-of-match popup
+    // moved into a modal. That guard is wrong: it suppresses the
+    // checkout prompt on every turn after the first leg of a
+    // multi-leg match, because doEndLeg() — the manual "End leg"
+    // command — sets game.winner to the leading player even when
+    // the match continues.)
     // Compute the index of the entry we just pushed (the last one
     // for this thrower in the current turn). The entry always lives
     // at the tail of game.rawDarts because we just pushed it.
